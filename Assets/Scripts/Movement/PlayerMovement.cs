@@ -1,6 +1,4 @@
 using System.Collections.Generic;
-using Unity.VisualScripting;
-using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using AnimatorController = UnityEditor.Animations.AnimatorController;
@@ -21,20 +19,17 @@ public class PlayerMovement : MonoBehaviour
     private AnimationClip _idleClip;
     private AnimationClip _walkClip;
     private AnimationClip _runClip;
-    
-    
 
-    AnimationClip[] addedClips;
+    
     private void Start()
     {
         _animator = GetComponent<Animator>();
         _animator.applyRootMotion = true;
         _animator.runtimeAnimatorController = _controller;
 
-        // _horizontal = Animator.StringToHash("Horizontal");
-        // _vertical = Animator.StringToHash("Vertical");
-        // _vertical= _animator.GetFloat("Vertical");
-        // _horizontal = _animator.GetFloat("Horizontal");
+        _horizontal = Animator.StringToHash("Horizontal");
+        _vertical = Animator.StringToHash("Vertical");
+
     }
 
     private void Update()
@@ -48,12 +43,12 @@ public class PlayerMovement : MonoBehaviour
             _animator.SetFloat("Vertical", _vertical);
     }
 
-
     private void UpdateStrafeAnim()
     {
         //Crossfade strafe
     }
 
+    
     public void OnMove(InputAction.CallbackContext ctx)
     {
         _direction = ctx.ReadValue<Vector2>();
@@ -68,8 +63,5 @@ public class PlayerMovement : MonoBehaviour
         _horizontal = x;
 
         _moveAmount = Mathf.Clamp01(Mathf.Abs(_vertical) + Mathf.Abs(_horizontal));
-         
     }
-    
-
 }
