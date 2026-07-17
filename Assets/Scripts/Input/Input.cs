@@ -9,6 +9,8 @@ public class Input : MonoBehaviour
     private PlayerMovement _movement;
     private PlayerCamera _camera;
 
+    public bool switchCamera;
+
 
     private void Start()
     {
