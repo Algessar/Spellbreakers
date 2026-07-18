@@ -1,9 +1,7 @@
-using System;
-using System.Numerics;
 using UnityEditor.Animations;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.UI;
+using Quaternion = UnityEngine.Quaternion;
 using Vector2 = UnityEngine.Vector2;
 using Vector3 = UnityEngine.Vector3;
 
@@ -19,7 +17,8 @@ namespace Player
         private Transform _transform;
 
 
-        [Header("Direction")] private PlayerCamera _camera;
+        [Header("Direction")] 
+        private PlayerCamera _camera;
 
         private int _verticalHash;
         private int _horizontalHash;
@@ -30,6 +29,8 @@ namespace Player
         [SerializeField] private float _horizontal = 0f;
         [SerializeField] private float _moveAmount = 0f;
         [SerializeField] private bool _isMoving = false;
+
+        [SerializeField] private float _rotationSpeed = 5f;
 
 
         [Header("Gravity & Ground")] [SerializeField]
@@ -52,6 +53,7 @@ namespace Player
             _transform = transform;
             _animator = GetComponent<Animator>();
             _capsule = GetComponent<CapsuleCollider>();
+            _camera = GetComponent<PlayerCamera>();
             _animator.runtimeAnimatorController = _controller;
 
             _animator.applyRootMotion = true;
@@ -76,7 +78,29 @@ namespace Player
         private void FixedUpdate()
         {
             HandleGravityAndGrounding();
+            UpdateMovementDirection();
             ApplyRootMotionWithCollision();
+        }
+
+        private void UpdateMovementDirection()
+        {
+            if (!_isMoving || _direction == Vector2.zero) return;
+
+            // 1. Build world-space direction from camera
+            // Vector3 camForward = Vector3.ProjectOnPlane(_camera.transform.forward, Vector3.up).normalized;
+            // Vector3 camRight   = Vector3.ProjectOnPlane(_camera.transform.right,   Vector3.up).normalized;
+            Vector3 worldMoveDir = _camera.GetCameraRelativeMoveDirection(_direction); //NOTE: Expensive because of Debug.LogWarning();
+
+            // 2. Smooth rotation toward target direction
+            Quaternion targetRotation = Quaternion.LookRotation(worldMoveDir, Vector3.up);
+            _transform.rotation = Quaternion.Slerp(_transform.rotation, targetRotation, _rotationSpeed * Time.fixedDeltaTime);
+
+            // 3. Convert world direction to local space for the animator blend tree
+            Vector3 localMove = _transform.InverseTransformDirection(worldMoveDir);
+            _vertical = localMove.z;
+            _horizontal = localMove.x;
+  
+            // (The Animator will be updated in Update() with these values)
         }
 
         private void HandleGravityAndGrounding()
@@ -146,7 +170,7 @@ namespace Player
             _transform.position = finalPosition;
 
             // 6. Apply root rotation separately (so turning feels smooth)
-            _transform.rotation *= _animator.deltaRotation;
+            // _transform.rotation *= _animator.deltaRotation;
         }
 
         private Vector3 ResolveCapsuleCollision(Vector3 origin, Vector3 movement)
@@ -233,7 +257,7 @@ namespace Player
         {
             _vertical = y;
             _horizontal = x;
-            _moveAmount = Mathf.Clamp01(Mathf.Abs(_vertical) + Mathf.Abs(_horizontal));
+            _moveAmount = Mathf.Clamp01(Mathf.Abs(x) + Mathf.Abs(y));
         }
 
         private void OnDrawGizmos()

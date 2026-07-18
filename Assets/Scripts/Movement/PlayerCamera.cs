@@ -15,17 +15,25 @@ namespace Player
             cameraDirection = ctx.ReadValue<Vector2>();
         }
 
-        public Vector3 GetCameraRelativeMoveDirection()
+        public Vector3 GetCameraRelativeMoveDirection(Vector2 moveInput)
         {
-            if (!_input) return Vector3.zero;
-            Vector2 input = Vector2.ClampMagnitude(cameraDirection, 1f);
-            if (input.sqrMagnitude < 0.0001f) return Vector3.zero;
+            if (_camera == null)
+            {
+                Debug.LogWarning("PlayerCamera: No camera assigned. Falling back to world‑space direction.");
+                return new Vector3(moveInput.x, 0f, moveInput.y).normalized;
+            }
 
-            if (!_camera) return new Vector3(input.x, 0f, input.y).normalized;
-
+            // Flatten camera forward and right onto the horizontal plane
             Vector3 forward = Vector3.ProjectOnPlane(_camera.transform.forward, Vector3.up).normalized;
-            Vector3 right = Vector3.ProjectOnPlane(_camera.transform.right, Vector3.up).normalized;
-            return (forward * input.y + right * input.x).normalized;
+            Vector3 right   = Vector3.ProjectOnPlane(_camera.transform.right,   Vector3.up).normalized;
+
+            // Combine based on the input axes: y = forward/back, x = left/right
+            Vector3 worldDirection = forward * moveInput.y + right * moveInput.x;
+
+            // Clamp magnitude and normalise to avoid faster diagonal movement
+            return Vector3.ClampMagnitude(worldDirection, 1f).normalized;
         }
+        
+        
     }
 }

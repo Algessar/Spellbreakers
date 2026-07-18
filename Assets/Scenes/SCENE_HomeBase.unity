@@ -279,8 +279,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.2534013, y: -0.00000017139801, z: 0.0000000448979, w: 0.9673613}
-  m_LocalPosition: {x: 13.9, y: -42.65, z: 307.9}
+  m_LocalRotation: {x: 0.30697381, y: -0.000000016304709, z: 0.000000005259036, w: 0.951718}
+  m_LocalPosition: {x: 13.9, y: -42.02, z: 307.9}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1249,6 +1249,10 @@ PrefabInstance:
       propertyPath: m_AnimatePhysics
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5866666021909216657, guid: a1e1783faf5747d40aafc61d413f5ffb, type: 3}
+      propertyPath: m_ApplyRootMotion
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5885303952893515207, guid: a1e1783faf5747d40aafc61d413f5ffb, type: 3}
       propertyPath: m_Layer
       value: 6
@@ -1358,7 +1362,7 @@ PrefabInstance:
       addedObject: {fileID: 893450598}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: a1e1783faf5747d40aafc61d413f5ffb, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 893450599}
+      addedObject: {fileID: 893450601}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: a1e1783faf5747d40aafc61d413f5ffb, type: 3}
       insertIndex: -1
       addedObject: {fileID: 893450591}
@@ -1425,31 +1429,6 @@ CapsuleCollider:
   m_Height: 1.8
   m_Direction: 1
   m_Center: {x: 0, y: 0.89, z: 0}
---- !u!114 &893450599
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 893450590}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5452f6145bcf1494089e7a2311a0e840, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Movement_V2
-  _controller: {fileID: 9100000, guid: 756ed1e039128cd47ab2a6b7d74c092d, type: 2}
-  _vertical: 0
-  _horizontal: 0
-  _moveAmount: 0
-  _isMoving: 0
-  _gravity: -15
-  _jumpHeight: 3
-  _groundCheckDistance: 0.15
-  _groundLayer:
-    serializedVersion: 2
-    m_Bits: 1
-  _verticalVelocity: 0
-  _isGrounded: 0
 --- !u!54 &893450600
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -1477,6 +1456,33 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 80
   m_CollisionDetection: 0
+--- !u!114 &893450601
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 893450590}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7336534db6a666e44912ccbfbb576b14, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Movement_V3
+  _controller: {fileID: 9100000, guid: 756ed1e039128cd47ab2a6b7d74c092d, type: 2}
+  _moveAmount: 0
+  _isMoving: 0
+  _rotationSpeed: 5
+  _crossFadeDuration: 0.1
+  _walkThreshold: 0.1
+  _runThreshold: 0.7
+  _gravity: -15
+  _jumpHeight: 3
+  _groundCheckDistance: 0.1
+  _groundLayer:
+    serializedVersion: 2
+    m_Bits: 1
+  _verticalVelocity: 0
+  _isGrounded: 0
 --- !u!1 &1210538674
 GameObject:
   m_ObjectHideFlags: 0
@@ -1681,8 +1687,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1528050184}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.0015357374, y: 0.9673435, z: -0.25339666, w: -0.005862688}
-  m_LocalPosition: {x: 0.048483077, y: 2.25, z: 3.9997072}
+  m_LocalRotation: {x: -0.0018604076, y: 0.9517005, z: -0.30696812, w: -0.005767866}
+  m_LocalPosition: {x: 0.048483077, y: 2.880001, z: 3.9997072}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1710,7 +1716,7 @@ MonoBehaviour:
       Enabled: 1
       Input:
         InputAction: {fileID: 6518038625973644014, guid: ed1d0d1e58a300848ba8998e5013bbe7, type: 3}
-        Gain: 1
+        Gain: 50
         LegacyInput: 
         LegacyGain: 1
         CancelDeltaTime: 0
@@ -1723,7 +1729,7 @@ MonoBehaviour:
       Enabled: 1
       Input:
         InputAction: {fileID: 6518038625973644014, guid: ed1d0d1e58a300848ba8998e5013bbe7, type: 3}
-        Gain: -1
+        Gain: -50
         LegacyInput: 
         LegacyGain: 1
         CancelDeltaTime: 0
@@ -1733,7 +1739,7 @@ MonoBehaviour:
         DecelTime: 0.2
     - Name: Orbit Scale
       Owner: {fileID: 1528050189}
-      Enabled: 1
+      Enabled: 0
       Input:
         InputAction: {fileID: 6518038625973644014, guid: ed1d0d1e58a300848ba8998e5013bbe7, type: 3}
         Gain: -1
@@ -1816,10 +1822,10 @@ MonoBehaviour:
   Orbits:
     Top:
       Radius: 2
-      Height: 5
+      Height: 4.95
     Center:
       Radius: 4
-      Height: 2.25
+      Height: 2.88
     Bottom:
       Radius: 2.5
       Height: 0.1
