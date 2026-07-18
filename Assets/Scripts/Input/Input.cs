@@ -1,53 +1,56 @@
-using System;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
-public class Input : MonoBehaviour
+
+namespace Player
 {
-    private Actions _actions;
 
-    private PlayerMovement _movement;
-    private Movement_V2 _move2;
-    private PlayerCamera _camera;
 
-    private void Start()
+    /// <summary>
+    /// Player Input class. Only used to register input actions.
+    /// </summary>
+    public class Input : MonoBehaviour
     {
-        _actions = new Actions();
+        private Actions _actions;
 
-        _movement = GetComponent<PlayerMovement>();
-        _move2 = GetComponent<Movement_V2>();
-        _camera = GetComponent<PlayerCamera>();
+        private PlayerMovement _movement;
+        private Movement_V2 _move2;
+        private PlayerCamera _camera;
 
-        _actions.Player.Enable();
+        private void Start()
+        {
+            _actions = new Actions();
 
-        // _actions.Player.Move.performed += _movement.OnMove;
-        // _actions.Player.Move.canceled  += _movement.OnMove;
-        
-        _actions.Player.Move.performed += _move2.OnMove;
-        _actions.Player.Move.canceled  += _move2.OnMove;
-        
+            _movement = GetComponent<PlayerMovement>();
+            _move2 = GetComponent<Movement_V2>();
+            _camera = GetComponent<PlayerCamera>();
 
-        _actions.Player.Look.performed += _camera.OnLook;
-        _actions.Player.Look.canceled  += _camera.OnLook;
+            _actions.Player.Enable();
+
+            // _actions.Player.Move.performed += _movement.OnMove;
+            // _actions.Player.Move.canceled  += _movement.OnMove;
+
+            _actions.Player.Move.performed += _move2.OnMove;
+            _actions.Player.Move.canceled += _move2.OnMove;
+
+
+            _actions.Player.Look.performed += _camera.OnLook;
+            _actions.Player.Look.canceled += _camera.OnLook;
+        }
+
+        private void OnDisable()
+        {
+            // _actions.Player.Move.performed -= _movement.OnMove;
+            // _actions.Player.Move.canceled  -= _movement.OnMove;
+
+            _actions.Player.Move.performed -= _move2.OnMove;
+            _actions.Player.Move.canceled -= _move2.OnMove;
+
+            _actions.Player.Look.performed -= _camera.OnLook;
+            _actions.Player.Look.canceled -= _camera.OnLook;
+
+            _actions.Disable();
+
+        }
+
     }
-
-    private void OnDisable()
-    {
-        // _actions.Player.Move.performed -= _movement.OnMove;
-        // _actions.Player.Move.canceled  -= _movement.OnMove;
-        
-        _actions.Player.Move.performed -= _move2.OnMove;
-        _actions.Player.Move.canceled  -= _move2.OnMove;
-
-        _actions.Player.Look.performed -= _camera.OnLook;
-        _actions.Player.Look.canceled  -= _camera.OnLook;
-        
-        _actions.Disable();
-
-    }
-
-
-
-
-
 }
