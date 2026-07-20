@@ -109,11 +109,56 @@ public partial class @Actions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""VomTag"",
+                    ""type"": ""Button"",
+                    ""id"": ""31b06064-a620-44e5-9b27-2af2f8694785"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Pflug"",
+                    ""type"": ""Button"",
+                    ""id"": ""b789f9f9-b608-4d2f-9357-ba75ae84aaec"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Alber"",
+                    ""type"": ""Button"",
+                    ""id"": ""f46d8c33-bd51-4856-9af0-1679da8384e6"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""Ochs"",
+                    ""type"": ""Button"",
+                    ""id"": ""2846ca51-3d0e-4890-877a-f9ed02fa00af"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""IronGate"",
+                    ""type"": ""Button"",
+                    ""id"": ""b9bf1691-9ea5-4c08-9257-6f963bb68295"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
                 {
-                    ""name"": ""2D Vector"",
+                    ""name"": ""Gamepad"",
                     ""id"": ""80000478-c371-4b08-a9f3-34432ebe62d7"",
                     ""path"": ""2DVector"",
                     ""interactions"": """",
@@ -160,6 +205,61 @@ public partial class @Actions: IInputActionCollection2, IDisposable
                     ""name"": ""right"",
                     ""id"": ""6935dd7b-6b06-4d09-8a5d-7c1f3ed1bdff"",
                     ""path"": ""<Gamepad>/leftStick/right"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Move"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""Keyboard"",
+                    ""id"": ""547853ca-c6a5-4aea-bec6-939b22f18a70"",
+                    ""path"": ""2DVector"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Move"",
+                    ""isComposite"": true,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": ""up"",
+                    ""id"": ""b91dda99-29b5-4848-bcb0-58f9b7d74156"",
+                    ""path"": ""<Keyboard>/w"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Move"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""down"",
+                    ""id"": ""3fcd3410-8905-4ff6-8489-b156042f2ba9"",
+                    ""path"": ""<Keyboard>/s"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Move"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""left"",
+                    ""id"": ""f52b2680-d986-448e-afad-74d94bd8e2d2"",
+                    ""path"": ""<Keyboard>/a"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Move"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""right"",
+                    ""id"": ""f5900ef7-09c6-4be9-9321-205967f0b034"",
+                    ""path"": ""<Keyboard>/d"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
@@ -221,6 +321,72 @@ public partial class @Actions: IInputActionCollection2, IDisposable
                     ""action"": ""Look"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""802784e2-2ca6-4128-91ff-19629f2082aa"",
+                    ""path"": ""<Mouse>/delta"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Look"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""35b854ad-e4f6-420b-bc48-23730dd55345"",
+                    ""path"": ""<Gamepad>/buttonSouth"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""VomTag"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""048ada8b-d67f-4a7d-82a8-ecd3a0ffb6f1"",
+                    ""path"": ""<Gamepad>/buttonWest"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Alber"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""c2636fca-3972-4365-adf6-2f562c955f11"",
+                    ""path"": ""<Gamepad>/buttonNorth"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Ochs"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""be81b075-496a-4fb9-9a6b-7e01fe013d86"",
+                    ""path"": ""<Gamepad>/buttonEast"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Pflug"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""f58b3866-4cc0-4bf3-89c3-fb2be6980c04"",
+                    ""path"": ""<Gamepad>/rightShoulder"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""IronGate"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -231,6 +397,11 @@ public partial class @Actions: IInputActionCollection2, IDisposable
         m_Player = asset.FindActionMap("Player", throwIfNotFound: true);
         m_Player_Move = m_Player.FindAction("Move", throwIfNotFound: true);
         m_Player_Look = m_Player.FindAction("Look", throwIfNotFound: true);
+        m_Player_VomTag = m_Player.FindAction("VomTag", throwIfNotFound: true);
+        m_Player_Pflug = m_Player.FindAction("Pflug", throwIfNotFound: true);
+        m_Player_Alber = m_Player.FindAction("Alber", throwIfNotFound: true);
+        m_Player_Ochs = m_Player.FindAction("Ochs", throwIfNotFound: true);
+        m_Player_IronGate = m_Player.FindAction("IronGate", throwIfNotFound: true);
     }
 
     ~@Actions()
@@ -313,6 +484,11 @@ public partial class @Actions: IInputActionCollection2, IDisposable
     private List<IPlayerActions> m_PlayerActionsCallbackInterfaces = new List<IPlayerActions>();
     private readonly InputAction m_Player_Move;
     private readonly InputAction m_Player_Look;
+    private readonly InputAction m_Player_VomTag;
+    private readonly InputAction m_Player_Pflug;
+    private readonly InputAction m_Player_Alber;
+    private readonly InputAction m_Player_Ochs;
+    private readonly InputAction m_Player_IronGate;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -332,6 +508,26 @@ public partial class @Actions: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player/Look".
         /// </summary>
         public InputAction @Look => m_Wrapper.m_Player_Look;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/VomTag".
+        /// </summary>
+        public InputAction @VomTag => m_Wrapper.m_Player_VomTag;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/Pflug".
+        /// </summary>
+        public InputAction @Pflug => m_Wrapper.m_Player_Pflug;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/Alber".
+        /// </summary>
+        public InputAction @Alber => m_Wrapper.m_Player_Alber;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/Ochs".
+        /// </summary>
+        public InputAction @Ochs => m_Wrapper.m_Player_Ochs;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/IronGate".
+        /// </summary>
+        public InputAction @IronGate => m_Wrapper.m_Player_IronGate;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -364,6 +560,21 @@ public partial class @Actions: IInputActionCollection2, IDisposable
             @Look.started += instance.OnLook;
             @Look.performed += instance.OnLook;
             @Look.canceled += instance.OnLook;
+            @VomTag.started += instance.OnVomTag;
+            @VomTag.performed += instance.OnVomTag;
+            @VomTag.canceled += instance.OnVomTag;
+            @Pflug.started += instance.OnPflug;
+            @Pflug.performed += instance.OnPflug;
+            @Pflug.canceled += instance.OnPflug;
+            @Alber.started += instance.OnAlber;
+            @Alber.performed += instance.OnAlber;
+            @Alber.canceled += instance.OnAlber;
+            @Ochs.started += instance.OnOchs;
+            @Ochs.performed += instance.OnOchs;
+            @Ochs.canceled += instance.OnOchs;
+            @IronGate.started += instance.OnIronGate;
+            @IronGate.performed += instance.OnIronGate;
+            @IronGate.canceled += instance.OnIronGate;
         }
 
         /// <summary>
@@ -381,6 +592,21 @@ public partial class @Actions: IInputActionCollection2, IDisposable
             @Look.started -= instance.OnLook;
             @Look.performed -= instance.OnLook;
             @Look.canceled -= instance.OnLook;
+            @VomTag.started -= instance.OnVomTag;
+            @VomTag.performed -= instance.OnVomTag;
+            @VomTag.canceled -= instance.OnVomTag;
+            @Pflug.started -= instance.OnPflug;
+            @Pflug.performed -= instance.OnPflug;
+            @Pflug.canceled -= instance.OnPflug;
+            @Alber.started -= instance.OnAlber;
+            @Alber.performed -= instance.OnAlber;
+            @Alber.canceled -= instance.OnAlber;
+            @Ochs.started -= instance.OnOchs;
+            @Ochs.performed -= instance.OnOchs;
+            @Ochs.canceled -= instance.OnOchs;
+            @IronGate.started -= instance.OnIronGate;
+            @IronGate.performed -= instance.OnIronGate;
+            @IronGate.canceled -= instance.OnIronGate;
         }
 
         /// <summary>
@@ -435,5 +661,40 @@ public partial class @Actions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnLook(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "VomTag" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnVomTag(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Pflug" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnPflug(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Alber" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnAlber(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Ochs" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnOchs(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "IronGate" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnIronGate(InputAction.CallbackContext context);
     }
 }

@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -17,7 +16,7 @@ namespace Player
 
         public Vector3 GetCameraRelativeMoveDirection(Vector2 moveInput)
         {
-            if (_camera == null)
+            if (!_camera)
             {
                 Debug.LogWarning("PlayerCamera: No camera assigned. Falling back to world‑space direction.");
                 return new Vector3(moveInput.x, 0f, moveInput.y).normalized;
