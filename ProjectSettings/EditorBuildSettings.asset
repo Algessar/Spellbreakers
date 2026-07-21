@@ -8,6 +8,12 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/SCENE_HomeBase.unity
     guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 1
+    path: Assets/Scenes/SCENE_TempleValley.unity
+    guid: 04f282249e433f844bae581a1d0ea2d1
+  - enabled: 1
+    path: Assets/Scenes/SCENE_Home_ScaleTest.unity
+    guid: 29bc31eab9be6984c9409f49fad37129
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: ed1d0d1e58a300848ba8998e5013bbe7, type: 3}
