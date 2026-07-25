@@ -9,7 +9,7 @@ public class CombatHandler : MonoBehaviour
 {
 
     [SerializeField] private Animator _animator;
-    private float _crossFade = 0.2f;
+    [SerializeField] private float _crossFade = 0.2f;
 
     private int[] _guardHashes;
     private int _vomtagHash;
