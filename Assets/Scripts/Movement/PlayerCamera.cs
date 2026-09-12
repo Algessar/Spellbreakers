@@ -5,7 +5,7 @@ namespace Player
 {
     public class PlayerCamera : MonoBehaviour
     {
-        private Input _input;
+        private InputHandler _input;
         [SerializeField] private Camera _camera;
         public Vector3 cameraDirection;
 

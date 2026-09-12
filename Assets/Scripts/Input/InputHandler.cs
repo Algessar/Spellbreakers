@@ -3,12 +3,10 @@ using UnityEngine;
 
 namespace Player
 {
-
-
     /// <summary>
     /// Player Input class. Only used to register input actions.
     /// </summary>
-    public class Input : MonoBehaviour
+    public class InputHandler : MonoBehaviour
     {
         private Actions _actions;
 

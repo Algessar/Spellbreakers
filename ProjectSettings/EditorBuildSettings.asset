@@ -15,7 +15,7 @@ EditorBuildSettings:
     path: Assets/World/Scenes/SCENE_TempleValley.unity
     guid: 04f282249e433f844bae581a1d0ea2d1
   - enabled: 1
-    path: Assets/World/Scenes/SCENE_Level2.unity
+    path: Assets/World/Scenes/SCENE_WindsweptMountains.unity
     guid: 0c969adf0b1ed094fb02bd1def6cb417
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
