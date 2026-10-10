@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.InputSystem;
 
 public class CombatHandler : MonoBehaviour
@@ -7,12 +8,15 @@ public class CombatHandler : MonoBehaviour
     [SerializeField] private Animator _animator;
     [SerializeField] private float _crossFade = 0.2f;
 
+     
+    
     private int[] _guardHashes;
     private int _vomtagHash;
     private int _alberHash;
     private int _pflugHash;
     private int _ochsHash;
     private int _irongateHash;
+    
 
     [Header("Triggered transitions")]
     //Major transitions
