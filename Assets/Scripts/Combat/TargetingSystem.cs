@@ -16,6 +16,9 @@ namespace Player
         [SerializeField, Range(0f, 1f)] private float _lookAtHeadWeight = 0.85f;
         [SerializeField, Range(0f, 1f)] private float _lookAtEyesWeight = 0.2f;
         [SerializeField, Min(0.1f)] private float _lookAtBlendSpeed = 4f;
+        [SerializeField, Range(0f, 1f)] private float _swordAimWeight = 0.85f;
+        [SerializeField, Min(0.1f)] private float _swordAimBlendSpeed = 5f;
+        [SerializeField] private Transform _swordTip;
         [SerializeField] private Camera _viewCamera;
 
         private readonly HashSet<Transform> _consideredTargets = new HashSet<Transform>();
@@ -27,6 +30,9 @@ namespace Player
         private Vector3 _currentAimPoint;
         private float _nextTargetRefreshTime;
         private float _lookAtWeight;
+        private float _swordAimWeightCurrent;
+        private Transform _rightHand;
+        private WeaponDamage _weaponDamage;
 
         public bool IsTargeting { get; private set; }
         public Transform CurrentTarget => _currentTarget;
@@ -43,6 +49,11 @@ namespace Player
 
             _playerRoot = _movement != null ? _movement.transform : transform.root;
 
+            if (_animator != null && _animator.isHuman)
+                _rightHand = _animator.GetBoneTransform(HumanBodyBones.RightHand);
+            if (_swordTip == null && _playerRoot != null)
+                _weaponDamage = _playerRoot.GetComponentInChildren<WeaponDamage>(true);
+
             if (_viewCamera == null)
                 _viewCamera = GetComponentInChildren<Camera>(true);
             if (_viewCamera == null)
@@ -54,6 +65,7 @@ namespace Player
             if (!IsTargeting)
             {
                 _lookAtWeight = Mathf.MoveTowards(_lookAtWeight, 0f, _lookAtBlendSpeed * Time.deltaTime);
+                _swordAimWeightCurrent = Mathf.MoveTowards(_swordAimWeightCurrent, 0f, _swordAimBlendSpeed * Time.deltaTime);
                 return;
             }
 
@@ -68,6 +80,10 @@ namespace Player
                 _lookAtWeight,
                 _currentTarget ? 1f : 0f,
                 _lookAtBlendSpeed * Time.deltaTime);
+            _swordAimWeightCurrent = Mathf.MoveTowards(
+                _swordAimWeightCurrent,
+                _currentTarget ? _swordAimWeight : 0f,
+                _swordAimBlendSpeed * Time.deltaTime);
         }
 
         private void OnDisable()
@@ -75,6 +91,7 @@ namespace Player
             IsTargeting = false;
             ClearTarget();
             _lookAtWeight = 0f;
+            _swordAimWeightCurrent = 0f;
             _movement?.SetTargeting(false, null);
         }
 
@@ -102,6 +119,7 @@ namespace Player
             IsTargeting = false;
             ClearTarget();
             _lookAtWeight = 0f;
+            _swordAimWeightCurrent = 0f;
             _movement?.SetTargeting(false, null);
         }
 
@@ -235,6 +253,8 @@ namespace Player
             if (_lookAtWeight <= 0f || _currentTarget == null)
             {
                 _animator.SetLookAtWeight(0f);
+                _animator.SetIKPositionWeight(AvatarIKGoal.RightHand, 0f);
+                _animator.SetIKRotationWeight(AvatarIKGoal.RightHand, 0f);
                 return;
             }
 
@@ -246,6 +266,66 @@ namespace Player
                 0.5f);
             _currentAimPoint = GetAimPoint(_currentTarget);
             _animator.SetLookAtPosition(_currentAimPoint);
+
+            ApplySwordAim();
+        }
+
+        private void ApplySwordAim()
+        {
+            if (_swordAimWeightCurrent <= 0f || _rightHand == null || !_rightHand ||
+                _currentTarget == null || !_animator.isHuman)
+            {
+                _animator.SetIKPositionWeight(AvatarIKGoal.RightHand, 0f);
+                _animator.SetIKRotationWeight(AvatarIKGoal.RightHand, 0f);
+                return;
+            }
+
+            var handPosition = _rightHand.position;
+            var handRotation = _rightHand.rotation;
+            if (!TryGetSwordTip(handPosition, out var tipPosition))
+            {
+                // Fall back to the hand's forward axis if no blade marker or weapon collider is available.
+                tipPosition = handPosition + handRotation * Vector3.forward;
+            }
+
+            var bladeDirection = tipPosition - handPosition;
+            var targetDirection = _currentAimPoint - handPosition;
+            if (bladeDirection.sqrMagnitude < 0.0001f || targetDirection.sqrMagnitude < 0.0001f)
+                return;
+
+            // Rotate the hand around its grip so the blade's current tip direction points at the target.
+            var aimDelta = Quaternion.FromToRotation(bladeDirection, targetDirection);
+            var aimedHandRotation = aimDelta * handRotation;
+            _animator.SetIKPosition(AvatarIKGoal.RightHand, handPosition);
+            _animator.SetIKRotation(AvatarIKGoal.RightHand, aimedHandRotation);
+            _animator.SetIKPositionWeight(AvatarIKGoal.RightHand, _swordAimWeightCurrent);
+            _animator.SetIKRotationWeight(AvatarIKGoal.RightHand, _swordAimWeightCurrent);
+        }
+
+        private bool TryGetSwordTip(Vector3 handPosition, out Vector3 tipPosition)
+        {
+            if (_swordTip != null)
+            {
+                tipPosition = _swordTip.position;
+                return true;
+            }
+
+            if (_weaponDamage == null || !_weaponDamage.TryGetComponent<BoxCollider>(out var box))
+            {
+                tipPosition = default;
+                return false;
+            }
+
+            // The weapon's box collider follows the blade. Pick the end furthest from the hand as the tip.
+            var size = box.size;
+            var axis = size.x >= size.y && size.x >= size.z ? Vector3.right :
+                size.y >= size.z ? Vector3.up : Vector3.forward;
+            var halfLength = Vector3.Scale(size, new Vector3(Mathf.Abs(axis.x), Mathf.Abs(axis.y), Mathf.Abs(axis.z))).magnitude * 0.5f;
+            var localCenter = box.center;
+            var endA = box.transform.TransformPoint(localCenter - axis * halfLength);
+            var endB = box.transform.TransformPoint(localCenter + axis * halfLength);
+            tipPosition = (endA - handPosition).sqrMagnitude > (endB - handPosition).sqrMagnitude ? endA : endB;
+            return true;
         }
     }
 }
