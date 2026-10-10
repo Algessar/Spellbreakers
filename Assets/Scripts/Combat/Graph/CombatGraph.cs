@@ -1,87 +1,58 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using UnityEngine;
-
-public class CombatGraphExecutor
+/// <summary>
+/// A guard change always follows the same route: current guard -> Langort -> destination guard.
+/// The graph owns logical combat state; CombatHandler plays the corresponding Animator states.
+/// </summary>
+public sealed class CombatGraph
 {
-    public void Execute(List<GuardNode> nodes, float input)
-    {
-        var unprocessed = new HashSet<GuardNode>(nodes);
-        var processed = new HashSet<GuardNode>();
+    public const string PassingGuard = "Langort";
 
-        while (unprocessed.Any())
+    public string CurrentGuard { get; private set; }
+    public bool IsTransitioning { get; private set; }
+
+    public CombatGraph(string initialGuard)
+    {
+        CurrentGuard = initialGuard;
+    }
+
+    public bool TryBeginTransition(string destination, out GuardTransition transition)
+    {
+        if (IsTransitioning || string.IsNullOrWhiteSpace(destination) || destination == CurrentGuard)
         {
-            var readyNodes = unprocessed.Where
-                (n => n.Dependencies.All
-                    (d => processed.Contains(d))).ToList();
-
-            if (readyNodes.Count == 0)
-            {
-                var stuckNodes = string.Join(", ", unprocessed.Select(n => n.Name));
-                throw new Exception($"Graph has a dependency cycle! Stuck on: {stuckNodes}");
-            }
-
-            Parallel.ForEach(readyNodes, readyNode =>
-            {
-  
-                var inputs = readyNode.Dependencies.ToDictionary(d => d, d => d.Output);
-                readyNode.Output = readyNode.Work(inputs, input);
-                Console.WriteLine($"[Executed] {readyNode.Name}");
-                
-            });
-
-            foreach (var node in readyNodes)
-            {
-                unprocessed.Remove(node);
-                processed.Add(node);
-            }
+            transition = default;
+            return false;
         }
+
+        IsTransitioning = true;
+        transition = new GuardTransition(CurrentGuard, PassingGuard, destination);
+        return true;
+    }
+
+    public bool CompleteTransition(GuardTransition transition)
+    {
+        if (!IsTransitioning || transition.From != CurrentGuard)
+            return false;
+
+        CurrentGuard = transition.To;
+        IsTransitioning = false;
+        return true;
+    }
+
+    public void CancelTransition()
+    {
+        IsTransitioning = false;
     }
 }
 
-public class CombatGraph
+public readonly struct GuardTransition
 {
-    private Dictionary<(string from, string to), string> transitionMap = new()
+    public string From { get; }
+    public string PassThrough { get; }
+    public string To { get; }
+
+    public GuardTransition(string from, string passThrough, string to)
     {
-        {("VomTag", "Alber"), "Langort"},
-        {("VomTag","Ochs"),"Kron"} //VomTagOchsAdjust?
-        
-    };
-}
-
-
-public class GuardNode
-{
-    public string Name { get; set;}
-    public List<GuardNode> Dependencies { get; set; } = new();
-    
-    
-    public Func<Dictionary<GuardNode, object>, float, object> Work { get; set; }
-    
-    public object Output { get; set; }
-}
-
-public class Guard
-{
-    public string Name;
-
-    public int _hash;
-
-    public Guard(string name)
-    {
-        Name = name;
-        _hash = Animator.StringToHash(Name);
+        From = from;
+        PassThrough = passThrough;
+        To = to;
     }
-
-    public int Hash()
-    {
-        return _hash;
-    }
-}
-
-public class PassingGuard
-{
-    
 }

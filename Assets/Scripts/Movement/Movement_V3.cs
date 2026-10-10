@@ -9,6 +9,12 @@ namespace Player
 {
     public class Movement_V3 : MonoBehaviour
     {
+        private static readonly int InGuardWalkForwardHash = Animator.StringToHash("InGuard-WalkForward");
+        private static readonly int InGuardStrafeLeftHash = Animator.StringToHash("InGuard-Strafe-Left");
+        private static readonly int InGuardStrafeRightHash = Animator.StringToHash("InGuard-Strafe-Right");
+        private static readonly int InGuardWalkBackwardHash = Animator.StringToHash("InGuard-WalkBackward");
+
+
         private Animator _animator;
         [SerializeField] private AnimatorController _controller;
         private CapsuleCollider _capsule;
@@ -22,6 +28,11 @@ namespace Player
         private int _walkHash;
         private int _runHash;
         private int _currentStateHash;   // track current state to avoid repeated CrossFade calls
+        private Vector3 _guardTransitionDirection;
+        private float _guardTransitionDistanceRemaining;
+        private float _guardTransitionTimeRemaining;
+        private bool _isTargeting;
+        private Transform _targetingTarget;
 
         private Vector2 _direction;
         [SerializeField] private float _vertical = 0f;
@@ -94,7 +105,11 @@ namespace Player
         {
             int targetHash;
 
-            if (!_isMoving || _moveAmount < _walkThreshold)
+            if (_isTargeting)
+            {
+                targetHash = GetTargetingMovementState();
+            }
+            else if (!_isMoving || _moveAmount < _walkThreshold)
             {
                 targetHash = _idleHash;
             }
@@ -107,16 +122,56 @@ namespace Player
                 targetHash = _runHash;
             }
 
-            // Only call CrossFade if the state actually changes
-            if (targetHash != _currentStateHash)
+            // Combat poses are layered above locomotion, so the Base Layer stays responsible
+            // for the normal idle, walk, and run cycle during guard transitions.
+            var currentState = _animator.GetCurrentAnimatorStateInfo(0);
+
+            // Also detect states changed by other systems, such as CombatHandler.
+            if (targetHash != _currentStateHash ||
+                (!_animator.IsInTransition(0) && currentState.shortNameHash != targetHash))
             {
                 _animator.CrossFade(targetHash, _crossFadeDuration);
                 _currentStateHash = targetHash;
             }
         }
 
+        private int GetTargetingMovementState()
+        {
+            const float inputThreshold = 0.1f;
+
+            if (!_isMoving || _moveAmount < inputThreshold)
+                return _idleHash;
+
+            if (_direction.x < -inputThreshold && Mathf.Abs(_direction.x) >= Mathf.Abs(_direction.y))
+                return InGuardStrafeLeftHash;
+
+            if (_direction.x > inputThreshold && Mathf.Abs(_direction.x) >= Mathf.Abs(_direction.y))
+                return InGuardStrafeRightHash;
+
+            // No backwards in-guard clip is available yet, so don't move through the target.
+            if (_direction.y <= inputThreshold)
+                return InGuardWalkBackwardHash;
+
+            return InGuardWalkForwardHash;
+        }
+
         private void UpdateMovementDirection()
         {
+            if (_isTargeting)
+            {
+                if (_targetingTarget != null)
+                {
+                    Vector3 toTarget = Vector3.ProjectOnPlane(_targetingTarget.position - _transform.position, Vector3.up);
+                    if (toTarget.sqrMagnitude > 0.0001f)
+                    {
+                        Quaternion targetFacingRotation = Quaternion.LookRotation(toTarget.normalized, Vector3.up);
+                        _transform.rotation = Quaternion.Slerp(_transform.rotation, targetFacingRotation, _rotationSpeed * Time.fixedDeltaTime);
+                    }
+                }
+
+                return;
+            }
+
             if (!_isMoving || _direction == Vector2.zero) return;
 
             Vector3 worldMoveDir = _camera.GetCameraRelativeMoveDirection(_direction);
@@ -169,14 +224,40 @@ namespace Player
         {
             Vector3 deltaRootMotion = _animator.deltaPosition;
             Vector3 horizontalMovement = new Vector3(deltaRootMotion.x, 0, deltaRootMotion.z);
+            Vector3 guardTransitionMovement = Vector3.zero;
+            if (_guardTransitionTimeRemaining > 0f && _guardTransitionDistanceRemaining > 0f)
+            {
+                float stepDuration = Mathf.Min(Time.fixedDeltaTime, _guardTransitionTimeRemaining);
+                float stepDistance = _guardTransitionDistanceRemaining * (stepDuration / _guardTransitionTimeRemaining);
+                guardTransitionMovement = _guardTransitionDirection * stepDistance;
+                _guardTransitionDistanceRemaining -= stepDistance;
+                _guardTransitionTimeRemaining -= stepDuration;
+            }
+
             Vector3 verticalMovement = Vector3.up * (_verticalVelocity * Time.fixedDeltaTime);
-            Vector3 desiredMovement = horizontalMovement + verticalMovement;
+            Vector3 desiredMovement = horizontalMovement + guardTransitionMovement + verticalMovement;
 
             if (desiredMovement.sqrMagnitude < 0.0001f)
                 return;
 
             Vector3 finalPosition = ResolveCapsuleCollision(_transform.position, desiredMovement);
             _transform.position = finalPosition;
+        }
+
+        public void AdvanceDuringGuardTransition(float distance, float duration)
+        {
+            if (distance <= 0f || duration <= 0f)
+                return;
+
+            _guardTransitionDirection = _transform.forward;
+            _guardTransitionDistanceRemaining = distance;
+            _guardTransitionTimeRemaining = duration;
+        }
+
+        public void SetTargeting(bool enabled, Transform target)
+        {
+            _isTargeting = enabled;
+            _targetingTarget = enabled ? target : null;
         }
 
         private Vector3 ResolveCapsuleCollision(Vector3 origin, Vector3 movement)

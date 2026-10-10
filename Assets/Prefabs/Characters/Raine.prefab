@@ -1371,7 +1371,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CombatHandler
   _animator: {fileID: 0}
-  _crossFade: 2.25
+  _initialGuard: VomTag
+  _langortForwardDistance: 0.75
 --- !u!114 &8060029830506327031
 MonoBehaviour:
   m_ObjectHideFlags: 0

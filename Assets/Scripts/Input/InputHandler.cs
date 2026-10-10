@@ -16,6 +16,7 @@ namespace Player
         private PlayerCamera _camera;
 
         private CombatHandler _combat;
+        private TargetingSystem _targeting;
 
         private void Start()
         {
@@ -28,6 +29,13 @@ namespace Player
             _camera = GetComponent<PlayerCamera>();
 
             _combat = GetComponent<CombatHandler>();
+
+            // Animator IK callbacks run on the Animator's GameObject.
+            var animator = GetComponentInChildren<Animator>(true);
+            var targetingHost = animator != null ? animator.gameObject : gameObject;
+            _targeting = targetingHost.GetComponent<TargetingSystem>();
+            if (_targeting == null)
+                _targeting = targetingHost.AddComponent<TargetingSystem>();
 
             _actions.Player.Enable();
 
@@ -45,7 +53,7 @@ namespace Player
             _actions.Player.Alber.started    += _combat.OnAlber;
             _actions.Player.Ochs.started     += _combat.OnOchs;
             _actions.Player.IronGate.started += _combat.OnIronGate;
-            // _actions.Player.VomTag.canceled += _combat.OnVomTag;
+            _actions.Player.SwitchTarget.started += _targeting.ToggleTargeting;
         }
 
         private void OnDisable()
@@ -60,6 +68,8 @@ namespace Player
             _actions.Player.Alber.started    -= _combat.OnAlber;
             _actions.Player.Ochs.started     -= _combat.OnOchs;
             _actions.Player.IronGate.started -= _combat.OnIronGate;
+            _actions.Player.SwitchTarget.started -= _targeting.ToggleTargeting;
+            _targeting?.StopTargeting();
 
 
             _actions.Disable();
