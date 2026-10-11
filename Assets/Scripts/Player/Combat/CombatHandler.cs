@@ -3,6 +3,7 @@ using Player;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+[RequireComponent(typeof(TargetingSystem))]
 public sealed class CombatHandler : MonoBehaviour
 {
     private const float BlendDuration = 0.12f;

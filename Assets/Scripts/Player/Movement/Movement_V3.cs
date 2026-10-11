@@ -7,6 +7,8 @@ using Vector3 = UnityEngine.Vector3;
 
 namespace Player
 {
+    [DisallowMultipleComponent]
+    [RequireComponent(typeof(InputHandler))]
     public class Movement_V3 : MonoBehaviour
     {
         private static readonly int InGuardWalkForwardHash = Animator.StringToHash("InGuard-WalkForward");
@@ -53,8 +55,8 @@ namespace Player
         [SerializeField] private float _groundCheckDistance = 0.1f;
         [SerializeField] private LayerMask _groundLayer = ~0;
 
-        [SerializeField] private float _verticalVelocity = 0f;
-        [SerializeField] private bool _isGrounded = false;
+        [SerializeField] private float _verticalVelocity;
+        [SerializeField] private bool _isGrounded;
 
         // ---- COLLISION SETTINGS (Auto-detected from CapsuleCollider) ----
         private float _capsuleRadius;
@@ -254,10 +256,10 @@ namespace Player
             _guardTransitionTimeRemaining = duration;
         }
 
-        public void SetTargeting(bool enabled, Transform target)
+        public void SetTargeting(bool targetingEnabled, Transform target)
         {
-            _isTargeting = enabled;
-            _targetingTarget = enabled ? target : null;
+            _isTargeting = targetingEnabled;
+            _targetingTarget = targetingEnabled ? target : null;
         }
 
         private Vector3 ResolveCapsuleCollision(Vector3 origin, Vector3 movement)

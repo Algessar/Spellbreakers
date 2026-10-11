@@ -6,6 +6,8 @@ namespace Player
     /// <summary>
     /// Player Input class. Only used to register input actions.
     /// </summary>
+    
+    [DisallowMultipleComponent]
     public class InputHandler : MonoBehaviour
     {
         private Actions _actions;
@@ -21,7 +23,7 @@ namespace Player
         private void Start()
         {
             _actions = new Actions();
-
+            _actions.Player.Enable();
             // _movement = GetComponent<PlayerMovement>();
             // _move2 = GetComponent<Movement_V2>();
             _move3 = GetComponent<Movement_V3>();
@@ -36,9 +38,6 @@ namespace Player
             _targeting = targetingHost.GetComponent<TargetingSystem>();
             if (_targeting == null)
                 _targeting = targetingHost.AddComponent<TargetingSystem>();
-
-            _actions.Player.Enable();
-
             
             _actions.Player.Move.performed   += _move3.OnMove;
             _actions.Player.Move.canceled    += _move3.OnMove;

@@ -28,7 +28,8 @@ public class PlayerMovement : MonoBehaviour
         _horizontal = 0f;
         _animator = GetComponent<Animator>();
         _animator.applyRootMotion = true;
-        _animator.runtimeAnimatorController = _controller;
+        if(_controller)
+            _animator.runtimeAnimatorController = _controller;
 
         _horizontal = Animator.StringToHash("Horizontal");
         _vertical = Animator.StringToHash("Vertical");

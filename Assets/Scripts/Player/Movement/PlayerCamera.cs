@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -8,6 +9,11 @@ namespace Player
         private InputHandler _input;
         [SerializeField] private Camera _camera;
         public Vector3 cameraDirection;
+
+        private void OnValidate()
+        {
+            _camera = Camera.main;
+        }
 
         public void OnLook(InputAction.CallbackContext ctx)
         {
