@@ -8,15 +8,14 @@ using Vector3 = UnityEngine.Vector3;
 namespace Player
 {
     [DisallowMultipleComponent]
-    [RequireComponent(typeof(InputHandler))]
+    [RequireComponent(typeof(InputHandler), typeof(CapsuleCollider), typeof(PlayerCamera))]
     public class Movement_V3 : MonoBehaviour
     {
         private static readonly int InGuardWalkForwardHash = Animator.StringToHash("InGuard-WalkForward");
         private static readonly int InGuardStrafeLeftHash = Animator.StringToHash("InGuard-Strafe-Left");
         private static readonly int InGuardStrafeRightHash = Animator.StringToHash("InGuard-Strafe-Right");
         private static readonly int InGuardWalkBackwardHash = Animator.StringToHash("InGuard-WalkBackward");
-
-
+     
         private Animator _animator;
         [SerializeField] private AnimatorController _controller;
         private CapsuleCollider _capsule;
@@ -35,6 +34,7 @@ namespace Player
         private float _guardTransitionTimeRemaining;
         private bool _isTargeting;
         private Transform _targetingTarget;
+        private float _targetFacingStartTime;
 
         private Vector2 _direction;
         [SerializeField] private float _vertical = 0f;
@@ -43,6 +43,15 @@ namespace Player
         [SerializeField] private bool _isMoving = false;
 
         [SerializeField] private float _rotationSpeed = 5f;
+
+        [Header("Target Lock Facing")]
+        [SerializeField, Min(0f)] private float _targetFacingDelay = 0.12f;
+        [SerializeField, Min(1f)] private float _targetFacingTurnSpeed = 240f;
+
+        [Header("Target Lock Animation")]
+        [Tooltip("Base Layer state used while locked on and stationary. Its lower-body pose can sit beneath the Passes guard overlay.")]
+        [SerializeField] private string _targetingIdleStateName = "InGuard-Idle";
+        private int _targetingIdleHash;
 
         // --- CrossFade settings ---
         [SerializeField] private float _crossFadeDuration = 0.1f;   // seconds for transition blend
@@ -66,10 +75,17 @@ namespace Player
         void Start()
         {
             _transform = transform;
-            _animator = GetComponent<Animator>();
-            _capsule = GetComponent<CapsuleCollider>();
+            // _animator = PlayerManager.Instance.animator;
+            if(!_animator)
+                _animator = GetComponent<Animator>();
+
+            // _capsule = PlayerManager.Instance.Collider;
+            if(!_capsule)
+                _capsule = GetComponent<CapsuleCollider>();
+            
+            
             _camera = GetComponent<PlayerCamera>();
-            _animator.runtimeAnimatorController = _controller;
+            // _animator.runtimeAnimatorController = _controller;
 
             _animator.applyRootMotion = true;   // DON'T TOUCH THIS
 
@@ -77,10 +93,11 @@ namespace Player
             _idleHash = Animator.StringToHash("Idle");
             _walkHash = Animator.StringToHash("Walk");
             _runHash  = Animator.StringToHash("Run");
+            _targetingIdleHash = Animator.StringToHash(_targetingIdleStateName);
 
             // Start in Idle
             _currentStateHash = _idleHash;
-            _animator.CrossFade(_idleHash, 0f);   // instant start
+            _animator.CrossFade(_idleHash, 0f, 0);   // instant start on Base Layer
 
             _capsuleRadius = _capsule.radius;
             _capsuleHeight = _capsule.height;
@@ -91,6 +108,22 @@ namespace Player
         {
             // --- Replace the old SetFloat calls with CrossFade logic ---
             UpdateAnimationState();
+        }
+
+        private void LateUpdate()
+        {
+            if (!_isTargeting || _targetingTarget == null || Time.time < _targetFacingStartTime)
+                return;
+
+            var toTarget = Vector3.ProjectOnPlane(_targetingTarget.position - _transform.position, Vector3.up);
+            if (toTarget.sqrMagnitude <= 0.0001f)
+                return;
+
+            var targetFacingRotation = Quaternion.LookRotation(toTarget.normalized, Vector3.up);
+            _transform.rotation = Quaternion.RotateTowards(
+                _transform.rotation,
+                targetFacingRotation,
+                _targetFacingTurnSpeed * Time.deltaTime);
         }
 
         private void FixedUpdate()
@@ -132,7 +165,7 @@ namespace Player
             if (targetHash != _currentStateHash ||
                 (!_animator.IsInTransition(0) && currentState.shortNameHash != targetHash))
             {
-                _animator.CrossFade(targetHash, _crossFadeDuration);
+                _animator.CrossFade(targetHash, _crossFadeDuration, 0);
                 _currentStateHash = targetHash;
             }
         }
@@ -142,7 +175,7 @@ namespace Player
             const float inputThreshold = 0.1f;
 
             if (!_isMoving || _moveAmount < inputThreshold)
-                return _idleHash;
+                return _animator.HasState(0, _targetingIdleHash) ? _targetingIdleHash : _idleHash;
 
             if (_direction.x < -inputThreshold && Mathf.Abs(_direction.x) >= Mathf.Abs(_direction.y))
                 return InGuardStrafeLeftHash;
@@ -160,19 +193,7 @@ namespace Player
         private void UpdateMovementDirection()
         {
             if (_isTargeting)
-            {
-                if (_targetingTarget != null)
-                {
-                    Vector3 toTarget = Vector3.ProjectOnPlane(_targetingTarget.position - _transform.position, Vector3.up);
-                    if (toTarget.sqrMagnitude > 0.0001f)
-                    {
-                        Quaternion targetFacingRotation = Quaternion.LookRotation(toTarget.normalized, Vector3.up);
-                        _transform.rotation = Quaternion.Slerp(_transform.rotation, targetFacingRotation, _rotationSpeed * Time.fixedDeltaTime);
-                    }
-                }
-
                 return;
-            }
 
             if (!_isMoving || _direction == Vector2.zero) return;
 
@@ -258,6 +279,9 @@ namespace Player
 
         public void SetTargeting(bool targetingEnabled, Transform target)
         {
+            if (targetingEnabled && (!_isTargeting || target != _targetingTarget))
+                _targetFacingStartTime = Time.time + _targetFacingDelay;
+
             _isTargeting = targetingEnabled;
             _targetingTarget = targetingEnabled ? target : null;
         }

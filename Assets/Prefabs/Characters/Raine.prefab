@@ -613,7 +613,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -9201637633878453517, guid: a1e1783faf5747d40aafc61d413f5ffb, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -9082564448754729203, guid: a1e1783faf5747d40aafc61d413f5ffb, type: 3}
       propertyPath: m_Layer
@@ -1329,7 +1329,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6289862590508202314, guid: a1e1783faf5747d40aafc61d413f5ffb, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6322428329660090021, guid: a1e1783faf5747d40aafc61d413f5ffb, type: 3}
       propertyPath: m_Layer
@@ -1585,6 +1585,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ff7a1155fcd2c884ab6ad4fbadce22d1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CombatHandler
+  Weapon: {fileID: 4083561186359985684}
+  MainHand: {fileID: 6951188310537787448}
   _animator: {fileID: 0}
   _initialGuard: VomTag
   _langortForwardDistance: 0.75
@@ -1621,7 +1623,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2227065863177064512}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: aeda7bfbf984f2a4da5ab4b8967b115d, type: 3}
   m_Name: 
@@ -1641,6 +1643,11 @@ MonoBehaviour:
 --- !u!4 &3579815712389143756 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2560092050734019037, guid: a1e1783faf5747d40aafc61d413f5ffb, type: 3}
+  m_PrefabInstance: {fileID: 1308657755449224465}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &4083561186359985684 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3063274617701608197, guid: a1e1783faf5747d40aafc61d413f5ffb, type: 3}
   m_PrefabInstance: {fileID: 1308657755449224465}
   m_PrefabAsset: {fileID: 0}
 --- !u!4 &6951188310537787448 stripped
@@ -1772,6 +1779,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 43f0347e1c2f3dd48a0d34ec7a96c6d6, type: 3}
       propertyPath: m_Name
       value: Raine_Rigify_Armoured
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 43f0347e1c2f3dd48a0d34ec7a96c6d6, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1303989830834867090, guid: 43f0347e1c2f3dd48a0d34ec7a96c6d6, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'

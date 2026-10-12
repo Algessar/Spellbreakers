@@ -19,6 +19,8 @@ namespace Player
         [SerializeField, Range(0f, 1f)] private float _swordAimWeight = 0.85f;
         [SerializeField, Min(0.1f)] private float _swordAimBlendSpeed = 5f;
         [SerializeField] private Transform _swordTip;
+        [SerializeField] private Transform _weaponAimBone;
+        [SerializeField] private string _weaponAimBoneName = "DEF-WEAPON_MAIN";
         [SerializeField] private Camera _viewCamera;
 
         private readonly HashSet<Transform> _consideredTargets = new HashSet<Transform>();
@@ -32,7 +34,9 @@ namespace Player
         private float _lookAtWeight;
         private float _swordAimWeightCurrent;
         private Transform _rightHand;
+        private Transform _leftHand;
         private WeaponDamage _weaponDamage;
+        private bool _guardPassAimActive;
 
         public bool IsTargeting { get; private set; }
         public Transform CurrentTarget => _currentTarget;
@@ -50,8 +54,18 @@ namespace Player
             _playerRoot = _movement != null ? _movement.transform : transform.root;
 
             if (_animator != null && _animator.isHuman)
+            {
                 _rightHand = _animator.GetBoneTransform(HumanBodyBones.RightHand);
-            if (_swordTip == null && _playerRoot != null)
+                _leftHand = _animator.GetBoneTransform(HumanBodyBones.LeftHand);
+            }
+            if (_playerRoot != null)
+            {
+                if (_swordTip == null)
+                    _swordTip = FindChildByName(_playerRoot, "Sword Tip");
+                if (_weaponAimBone == null && !string.IsNullOrWhiteSpace(_weaponAimBoneName))
+                    _weaponAimBone = FindChildByName(_playerRoot, _weaponAimBoneName);
+            }
+            // if (_swordTip == null && _playerRoot != null)
                 _weaponDamage = _playerRoot.GetComponentInChildren<WeaponDamage>(true);
 
             if (_viewCamera == null)
@@ -89,6 +103,7 @@ namespace Player
         private void OnDisable()
         {
             IsTargeting = false;
+            _guardPassAimActive = false;
             ClearTarget();
             _lookAtWeight = 0f;
             _swordAimWeightCurrent = 0f;
@@ -117,6 +132,7 @@ namespace Player
         public void StopTargeting()
         {
             IsTargeting = false;
+            _guardPassAimActive = false;
             ClearTarget();
             _lookAtWeight = 0f;
             _swordAimWeightCurrent = 0f;
@@ -244,17 +260,24 @@ namespace Player
             _currentAimPoint = default;
         }
 
-        // Unity invokes this callback on the GameObject that owns the Animator.
+        public void SetGuardPassAimActive(bool active)
+        {
+            _guardPassAimActive = active;
+        }
+
+        // The Passes layer has IK Pass enabled so the pose correction is applied after its animation.
         private void OnAnimatorIK(int layerIndex)
         {
-            if (layerIndex != 0 || _animator == null)
+            if (_animator == null)
                 return;
 
-            if (_lookAtWeight <= 0f || _currentTarget == null)
+            var passesLayer = _animator.GetLayerIndex("Passes");
+            if (passesLayer < 0 || layerIndex != passesLayer)
+                return;
+
+            if (!_guardPassAimActive || !IsTargeting || _lookAtWeight <= 0f || _currentTarget == null)
             {
-                _animator.SetLookAtWeight(0f);
-                _animator.SetIKPositionWeight(AvatarIKGoal.RightHand, 0f);
-                _animator.SetIKRotationWeight(AvatarIKGoal.RightHand, 0f);
+                ClearIKWeights();
                 return;
             }
 
@@ -275,31 +298,104 @@ namespace Player
             if (_swordAimWeightCurrent <= 0f || _rightHand == null || !_rightHand ||
                 _currentTarget == null || !_animator.isHuman)
             {
-                _animator.SetIKPositionWeight(AvatarIKGoal.RightHand, 0f);
-                _animator.SetIKRotationWeight(AvatarIKGoal.RightHand, 0f);
+                ClearHandIKWeights();
                 return;
             }
 
             var handPosition = _rightHand.position;
             var handRotation = _rightHand.rotation;
+            var canAimWeaponBone = _weaponAimBone != null;
+            var leftHandLocalPosition = canAimWeaponBone && _leftHand != null
+                ? _weaponAimBone.InverseTransformPoint(_leftHand.position)
+                : Vector3.zero;
+            var leftHandLocalRotation = canAimWeaponBone && _leftHand != null
+                ? Quaternion.Inverse(_weaponAimBone.rotation) * _leftHand.rotation
+                : Quaternion.identity;
             if (!TryGetSwordTip(handPosition, out var tipPosition))
             {
-                // Fall back to the hand's forward axis if no blade marker or weapon collider is available.
-                tipPosition = handPosition + handRotation * Vector3.forward;
+                // Prefer the weapon bone's forward axis if no blade marker or collider is available.
+                var fallbackRotation = canAimWeaponBone ? _weaponAimBone.rotation : handRotation;
+                tipPosition = handPosition + fallbackRotation * Vector3.forward;
             }
 
             var bladeDirection = tipPosition - handPosition;
             var targetDirection = _currentAimPoint - handPosition;
             if (bladeDirection.sqrMagnitude < 0.0001f || targetDirection.sqrMagnitude < 0.0001f)
+            {
+                ClearHandIKWeights();
                 return;
+            }
 
-            // Rotate the hand around its grip so the blade's current tip direction points at the target.
             var aimDelta = Quaternion.FromToRotation(bladeDirection, targetDirection);
-            var aimedHandRotation = aimDelta * handRotation;
+            var weightedAimDelta = Quaternion.Slerp(Quaternion.identity, aimDelta, _swordAimWeightCurrent);
+
+            // DEF-WEAPON_MAIN is an extra (non-Humanoid) transform, so steer it directly as well as
+            // asking the Humanoid solver to bring the right hand along with the authored grip.
+            if (_weaponAimBone != null)
+            {
+                var weaponDirection = tipPosition - _weaponAimBone.position;
+                var weaponTargetDirection = _currentAimPoint - _weaponAimBone.position;
+                if (weaponDirection.sqrMagnitude > 0.0001f && weaponTargetDirection.sqrMagnitude > 0.0001f)
+                {
+                    var weaponDelta = Quaternion.FromToRotation(weaponDirection, weaponTargetDirection);
+                    var weightedWeaponDelta = Quaternion.Slerp(Quaternion.identity, weaponDelta, _swordAimWeightCurrent);
+                    _weaponAimBone.rotation = weightedWeaponDelta * _weaponAimBone.rotation;
+
+                    // Carry the authored off-hand grip point with the weapon bone, then let Humanoid IK
+                    // pull the left arm back to it after the weapon has been steered.
+                    if (_leftHand != null)
+                    {
+                        _animator.SetIKPosition(AvatarIKGoal.LeftHand, _weaponAimBone.TransformPoint(leftHandLocalPosition));
+                        _animator.SetIKRotation(AvatarIKGoal.LeftHand, _weaponAimBone.rotation * leftHandLocalRotation);
+                        _animator.SetIKPositionWeight(AvatarIKGoal.LeftHand, _swordAimWeightCurrent);
+                        _animator.SetIKRotationWeight(AvatarIKGoal.LeftHand, _swordAimWeightCurrent);
+                    }
+                }
+                else
+                {
+                    _animator.SetIKPositionWeight(AvatarIKGoal.LeftHand, 0f);
+                    _animator.SetIKRotationWeight(AvatarIKGoal.LeftHand, 0f);
+                }
+            }
+            else
+            {
+                _animator.SetIKPositionWeight(AvatarIKGoal.LeftHand, 0f);
+                _animator.SetIKRotationWeight(AvatarIKGoal.LeftHand, 0f);
+            }
+
             _animator.SetIKPosition(AvatarIKGoal.RightHand, handPosition);
-            _animator.SetIKRotation(AvatarIKGoal.RightHand, aimedHandRotation);
+            _animator.SetIKRotation(AvatarIKGoal.RightHand, weightedAimDelta * handRotation);
             _animator.SetIKPositionWeight(AvatarIKGoal.RightHand, _swordAimWeightCurrent);
             _animator.SetIKRotationWeight(AvatarIKGoal.RightHand, _swordAimWeightCurrent);
+        }
+
+        private void ClearIKWeights()
+        {
+            _animator.SetLookAtWeight(0f);
+            ClearHandIKWeights();
+        }
+
+        private void ClearHandIKWeights()
+        {
+            _animator.SetIKPositionWeight(AvatarIKGoal.RightHand, 0f);
+            _animator.SetIKRotationWeight(AvatarIKGoal.RightHand, 0f);
+            _animator.SetIKPositionWeight(AvatarIKGoal.LeftHand, 0f);
+            _animator.SetIKRotationWeight(AvatarIKGoal.LeftHand, 0f);
+        }
+
+        private static Transform FindChildByName(Transform root, string childName)
+        {
+            if (root.name == childName)
+                return root;
+
+            for (var i = 0; i < root.childCount; i++)
+            {
+                var found = FindChildByName(root.GetChild(i), childName);
+                if (found != null)
+                    return found;
+            }
+
+            return null;
         }
 
         private bool TryGetSwordTip(Vector3 handPosition, out Vector3 tipPosition)

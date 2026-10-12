@@ -6,7 +6,8 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(TargetingSystem))]
 public sealed class CombatHandler : MonoBehaviour
 {
-    private const float BlendDuration = 0.12f;
+    public float BlendDuration = 0.12f;
+    public float blendDuration => BlendDuration;
 
     [SerializeField] private Animator _animator;
     [SerializeField] private string _initialGuard = "VomTag";
@@ -15,15 +16,17 @@ public sealed class CombatHandler : MonoBehaviour
     private int _passLayer = -1;
     private CombatGraph _combatGraph;
     private Movement_V3 _movement;
+    private TargetingSystem _targetingSystem;
     private Coroutine _transitionRoutine;
     private string _queuedGuard;
 
     private static readonly int LangortState = Animator.StringToHash("Langort");
-
+    
+    
     private IEnumerator Start()
     {
         if (_animator == null)
-            _animator = GetComponentInChildren<Animator>(true);
+            _animator = GetComponent<Animator>();
 
         if (_animator == null)
         {
@@ -33,6 +36,7 @@ public sealed class CombatHandler : MonoBehaviour
         }
 
         _movement = GetComponent<Movement_V3>();
+        _targetingSystem = GetComponent<TargetingSystem>();
         if (_movement == null)
             _movement = GetComponentInParent<Movement_V3>();
         if (_movement == null)
@@ -59,6 +63,7 @@ public sealed class CombatHandler : MonoBehaviour
 
         _transitionRoutine = null;
         _queuedGuard = null;
+        _targetingSystem?.SetGuardPassAimActive(false);
         _combatGraph?.CancelTransition();
     }
 
@@ -109,6 +114,7 @@ public sealed class CombatHandler : MonoBehaviour
 
     private IEnumerator PlayTransition(GuardTransition transition)
     {
+        _targetingSystem?.SetGuardPassAimActive(false);
         var passPath = Animator.StringToHash($"Passes.{transition.PassThrough}");
         _animator.CrossFadeInFixedTime(passPath, BlendDuration, _passLayer);
 
@@ -120,6 +126,8 @@ public sealed class CombatHandler : MonoBehaviour
             state = _animator.GetCurrentAnimatorStateInfo(_passLayer);
         }
         while (state.shortNameHash != LangortState);
+
+        _targetingSystem?.SetGuardPassAimActive(true);
 
         _movement?.AdvanceDuringGuardTransition(_langortForwardDistance, state.length);
 
@@ -137,6 +145,7 @@ public sealed class CombatHandler : MonoBehaviour
             yield return null;
         }
 
+        _targetingSystem?.SetGuardPassAimActive(false);
         var destinationPath = Animator.StringToHash($"Passes.{transition.To}");
         _animator.CrossFadeInFixedTime(destinationPath, BlendDuration, _passLayer);
         yield return new WaitForSeconds(BlendDuration);
