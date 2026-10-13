@@ -26,7 +26,7 @@ AvatarMask:
   - m_Path: Deform/root
     m_Weight: 0
   - m_Path: Deform/root/DEF-spine
-    m_Weight: 0
+    m_Weight: 1
   - m_Path: Deform/root/DEF-spine/DEF-pelvis.L
     m_Weight: 0
   - m_Path: Deform/root/DEF-spine/DEF-pelvis.R
@@ -34,9 +34,9 @@ AvatarMask:
   - m_Path: Deform/root/DEF-spine/DEF-Side_Scabbard
     m_Weight: 0
   - m_Path: Deform/root/DEF-spine/DEF-spine.001
-    m_Weight: 0
+    m_Weight: 1
   - m_Path: Deform/root/DEF-spine/DEF-spine.001/DEF-spine.002
-    m_Weight: 0
+    m_Weight: 1
   - m_Path: Deform/root/DEF-spine/DEF-spine.001/DEF-spine.002/DEF-spine.003
     m_Weight: 1
   - m_Path: Deform/root/DEF-spine/DEF-spine.001/DEF-spine.002/DEF-spine.003/DEF-Back_scabbard

@@ -26,32 +26,6 @@ AnimatorState:
   m_MirrorParameter: 
   m_CycleOffsetParameter: 
   m_TimeParameter: 
---- !u!1102 &-7151557074464046767
-AnimatorState:
-  serializedVersion: 6
-  m_ObjectHideFlags: 1
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Langort
-  m_Speed: 1
-  m_CycleOffset: 0
-  m_Transitions: []
-  m_StateMachineBehaviours: []
-  m_Position: {x: 50, y: 50, z: 0}
-  m_IKOnFeet: 0
-  m_WriteDefaultValues: 1
-  m_Mirror: 0
-  m_SpeedParameterActive: 0
-  m_MirrorParameterActive: 0
-  m_CycleOffsetParameterActive: 0
-  m_TimeParameterActive: 0
-  m_Motion: {fileID: 1998500851026175760, guid: d03105f0c77ff404c831616d32c7047c, type: 3}
-  m_Tag: 
-  m_SpeedParameter: 
-  m_MirrorParameter: 
-  m_CycleOffsetParameter: 
-  m_TimeParameter: 
 --- !u!1102 &-6041415376024342344
 AnimatorState:
   serializedVersion: 6
@@ -386,7 +360,7 @@ AnimatorController:
   - serializedVersion: 5
     m_Name: Passes
     m_StateMachine: {fileID: 9113368154853253287}
-    m_Mask: {fileID: 31900000, guid: 23ee9b46feb86774e8c37614e2d58249, type: 2}
+    m_Mask: {fileID: 31900000, guid: 1ccc307c18c375d4bb28a9e543f74620, type: 2}
     m_Motions: []
     m_Behaviours: []
     m_BlendingMode: 0
@@ -396,32 +370,6 @@ AnimatorController:
     m_SyncedLayerAffectsTiming: 0
     m_Controller: {fileID: 9100000}
   m_EvaluateTransitionsOnStart: 1
---- !u!1102 &135406389412758033
-AnimatorState:
-  serializedVersion: 6
-  m_ObjectHideFlags: 1
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Langort
-  m_Speed: 1
-  m_CycleOffset: 0
-  m_Transitions: []
-  m_StateMachineBehaviours: []
-  m_Position: {x: 50, y: 50, z: 0}
-  m_IKOnFeet: 0
-  m_WriteDefaultValues: 1
-  m_Mirror: 0
-  m_SpeedParameterActive: 0
-  m_MirrorParameterActive: 0
-  m_CycleOffsetParameterActive: 0
-  m_TimeParameterActive: 0
-  m_Motion: {fileID: 1998500851026175760, guid: d03105f0c77ff404c831616d32c7047c, type: 3}
-  m_Tag: 
-  m_SpeedParameter: 
-  m_MirrorParameter: 
-  m_CycleOffsetParameter: 
-  m_TimeParameter: 
 --- !u!1102 &146415792748234491
 AnimatorState:
   serializedVersion: 6
@@ -598,7 +546,33 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 1998500851026175760, guid: d03105f0c77ff404c831616d32c7047c, type: 3}
+  m_Motion: {fileID: 8017073410129644323, guid: 1ffdc548d65087642a61b758312c12f1, type: 3}
+  m_Tag: 
+  m_SpeedParameter: 
+  m_MirrorParameter: 
+  m_CycleOffsetParameter: 
+  m_TimeParameter: 
+--- !u!1102 &5054912274010512158
+AnimatorState:
+  serializedVersion: 6
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Langort
+  m_Speed: 1
+  m_CycleOffset: 0
+  m_Transitions: []
+  m_StateMachineBehaviours: []
+  m_Position: {x: 50, y: 50, z: 0}
+  m_IKOnFeet: 0
+  m_WriteDefaultValues: 1
+  m_Mirror: 0
+  m_SpeedParameterActive: 0
+  m_MirrorParameterActive: 0
+  m_CycleOffsetParameterActive: 0
+  m_TimeParameterActive: 0
+  m_Motion: {fileID: 8017073410129644323, guid: 1ffdc548d65087642a61b758312c12f1, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
@@ -637,9 +611,6 @@ AnimatorStateMachine:
   - serializedVersion: 1
     m_State: {fileID: 3332800567531901241}
     m_Position: {x: 400, y: 390, z: 0}
-  - serializedVersion: 1
-    m_State: {fileID: -7151557074464046767}
-    m_Position: {x: 690, y: 420, z: 0}
   m_ChildStateMachines: []
   m_AnyStateTransitions: []
   m_EntryTransitions: []
@@ -701,7 +672,7 @@ AnimatorStateMachine:
     m_State: {fileID: -3444731163914188681}
     m_Position: {x: 320, y: 510, z: 0}
   - serializedVersion: 1
-    m_State: {fileID: 135406389412758033}
+    m_State: {fileID: 5054912274010512158}
     m_Position: {x: 320, y: 630, z: 0}
   m_ChildStateMachines: []
   m_AnyStateTransitions: []

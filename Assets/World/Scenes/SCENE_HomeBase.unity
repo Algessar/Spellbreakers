@@ -202721,7 +202721,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ff7a1155fcd2c884ab6ad4fbadce22d1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CombatHandler
-  BlendDuration: 0.6
+  BlendDuration: 0.14
   _animator: {fileID: 0}
   _initialGuard: VomTag
   _langortForwardDistance: 0
