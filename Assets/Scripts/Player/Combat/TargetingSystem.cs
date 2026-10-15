@@ -30,7 +30,6 @@ namespace Player
         private Transform _currentTarget;
       
         private Damageable _currentDamageable;
-        private Vector3 _currentAimPoint;
         private float _nextTargetRefreshTime;
         private float _lookAtWeight;
         private float _swordAimWeightCurrent;
@@ -41,7 +40,7 @@ namespace Player
         private CombatHandler _combatHandler;
 
         public bool IsTargeting { get; private set; }
-        [field: SerializeField] public Transform CurrentTarget => _currentTarget;
+        public Transform CurrentTarget => _currentTarget;
         public Transform TargetCurrent;
 
         public static TargetingSystem GetOrAddForAnimator(Animator animator)
@@ -86,8 +85,8 @@ namespace Player
                 if (_weaponAimBone == null && !string.IsNullOrWhiteSpace(_weaponAimBoneName))
                     _weaponAimBone = FindChildByName(_playerRoot, _weaponAimBoneName);
             }
-            // if (_swordTip == null && _playerRoot != null)
-                _weaponDamage = _playerRoot.GetComponentInChildren<WeaponDamage>(true);
+
+            _weaponDamage = _playerRoot != null ? _playerRoot.GetComponentInChildren<WeaponDamage>(true) : null;
 
             if (_viewCamera == null)
                 _viewCamera = GetComponentInChildren<Camera>(true);
@@ -99,10 +98,27 @@ namespace Player
 
         private void OnEnable()
         {
+            SubscribeToCombatHandler();
+        }
+
+        private void Start()
+        {
+            // This component can be added at runtime by GetOrAddForAnimator, which may run before the
+            // CombatHandler on an ancestor has been resolved. Retry here so the strike-phase gate is
+            // never silently missed.
+            SubscribeToCombatHandler();
+        }
+
+        private void SubscribeToCombatHandler()
+        {
             if (_combatHandler == null)
                 _combatHandler = GetComponentInParent<CombatHandler>();
-            if (_combatHandler != null)
-                _combatHandler.PhaseChanged += HandlePassPhaseChanged;
+
+            if (_combatHandler == null)
+                return;
+
+            _combatHandler.PhaseChanged -= HandlePassPhaseChanged;
+            _combatHandler.PhaseChanged += HandlePassPhaseChanged;
         }
 
         private void Update()
@@ -188,7 +204,6 @@ namespace Player
 
             Transform bestTarget = null;
             Damageable bestDamageable = null;
-            Vector3 bestAimPoint = default;
             var bestScore = float.PositiveInfinity;
 
             foreach (var targetCollider in colliders)
@@ -200,7 +215,7 @@ namespace Player
                         ? targetCollider.attachedRigidbody.transform
                         : targetCollider.transform.root;
 
-                ConsiderTarget(target, damageable, center, ref bestTarget, ref bestDamageable, ref bestAimPoint, ref bestScore);
+                ConsiderTarget(target, damageable, center, ref bestTarget, ref bestDamageable, ref bestScore);
             }
 
             // Damageable props such as the training dummy can be targetable without using the Enemy layer.
@@ -208,12 +223,11 @@ namespace Player
             foreach (var damageable in damageableTargets)
             {
                 if (damageable && !damageable.IsDead)
-                    ConsiderTarget(damageable.transform, damageable, center, ref bestTarget, ref bestDamageable, ref bestAimPoint, ref bestScore);
+                    ConsiderTarget(damageable.transform, damageable, center, ref bestTarget, ref bestDamageable, ref bestScore);
             }
 
             _currentTarget = bestTarget;
             _currentDamageable = bestDamageable;
-            _currentAimPoint = bestAimPoint;
             _movement?.SetTargeting(IsTargeting, _currentTarget);
         }
 
@@ -223,7 +237,6 @@ namespace Player
             Vector3 origin,
             ref Transform bestTarget,
             ref Damageable bestDamageable,
-            ref Vector3 bestAimPoint,
             ref float bestScore)
         {
             if (!target || target == _playerRoot || target.IsChildOf(_playerRoot) ||
@@ -251,13 +264,10 @@ namespace Player
             bestScore = score;
             bestTarget = target;
             bestDamageable = damageable;
-            bestAimPoint = aimPoint;
         }
 
         private static Vector3 GetAimPoint(Transform target)
         {
-            
-            
             var colliders = target.GetComponentsInChildren<Collider>(true);
             var hasBounds = false;
             var bounds = default(Bounds);
@@ -294,7 +304,6 @@ namespace Player
         {
             _currentTarget = null;
             _currentDamageable = null;
-            _currentAimPoint = default;
         }
 
         private void HandlePassPhaseChanged(PassPhase phase)
@@ -329,8 +338,7 @@ namespace Player
                 _lookAtHeadWeight,
                 _lookAtEyesWeight,
                 0.5f);
-            _currentAimPoint = GetAimPoint(_currentTarget);
-            _animator.SetLookAtPosition(_currentAimPoint);
+            _animator.SetLookAtPosition(GetAimPoint(_currentTarget));
 
             ApplySwordAim();
         }
@@ -346,6 +354,7 @@ namespace Player
 
             var handPosition = _rightHand.position;
             var handRotation = _rightHand.rotation;
+            var aimPoint = GetAimPoint(_currentTarget);
             var canAimWeaponBone = _weaponAimBone != null;
             var leftHandLocalPosition = canAimWeaponBone && _leftHand != null
                 ? _weaponAimBone.InverseTransformPoint(_leftHand.position)
@@ -361,7 +370,7 @@ namespace Player
             }
 
             var bladeDirection = tipPosition - handPosition;
-            var targetDirection = _currentAimPoint - handPosition;
+            var targetDirection = aimPoint - handPosition;
             if (bladeDirection.sqrMagnitude < 0.0001f || targetDirection.sqrMagnitude < 0.0001f)
             {
                 ClearHandIKWeights();
@@ -376,7 +385,7 @@ namespace Player
             if (_weaponAimBone != null)
             {
                 var weaponDirection = tipPosition - _weaponAimBone.position;
-                var weaponTargetDirection = _currentAimPoint - _weaponAimBone.position;
+                var weaponTargetDirection = aimPoint - _weaponAimBone.position;
                 if (weaponDirection.sqrMagnitude > 0.0001f && weaponTargetDirection.sqrMagnitude > 0.0001f)
                 {
                     var weaponDelta = Quaternion.FromToRotation(weaponDirection, weaponTargetDirection);

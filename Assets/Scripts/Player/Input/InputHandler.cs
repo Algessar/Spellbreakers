@@ -11,9 +11,6 @@ namespace Player
     public class InputHandler : MonoBehaviour
     {
         private Actions _actions;
-
-        // private PlayerMovement _movement;
-        // private Movement_V2 _move2;
         private Movement_V3 _move3;
         private PlayerCamera _camera;
 
@@ -24,8 +21,6 @@ namespace Player
         {
             _actions = new Actions();
             _actions.Player.Enable();
-            // _movement = GetComponent<PlayerMovement>();
-            // _move2 = GetComponent<Movement_V2>();
             _move3 = GetComponent<Movement_V3>();
 
             _camera = GetComponent<PlayerCamera>();

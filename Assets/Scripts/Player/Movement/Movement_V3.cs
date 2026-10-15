@@ -32,8 +32,6 @@ namespace Player
         private float _targetFacingStartTime;
 
         private Vector2 _direction;
-        [SerializeField] private float _vertical = 0f;
-        [SerializeField] private float _horizontal = 0f;
         [SerializeField] private float _moveAmount = 0f;
         [SerializeField] private bool _isMoving = false;
 
@@ -55,7 +53,6 @@ namespace Player
 
         [Header("Gravity & Ground")] 
         [SerializeField] private float _gravity = -15f;
-        [SerializeField] private float _jumpHeight = 3f;
         [SerializeField] private float _groundCheckDistance = 0.1f;
         [SerializeField] private LayerMask _groundLayer = ~0;
 
@@ -70,18 +67,30 @@ namespace Player
         void Start()
         {
             _transform = transform;
-            // _animator = PlayerManager.Instance.animator;
-            if(!_animator)
+
+            if (!_animator)
                 _animator = GetComponent<Animator>();
 
-            // _capsule = PlayerManager.Instance.Collider;
-            if(!_capsule)
+            if (!_capsule)
                 _capsule = GetComponent<CapsuleCollider>();
-            
-            
+
             _camera = GetComponent<PlayerCamera>();
 
-            _animator.applyRootMotion = true;   // DON'T TOUCH THIS
+            if (_animator == null)
+            {
+                Debug.LogError("Movement_V3 requires an Animator on this object.", this);
+                enabled = false;
+                return;
+            }
+
+            if (_capsule == null)
+            {
+                Debug.LogError("Movement_V3 requires a CapsuleCollider on this object.", this);
+                enabled = false;
+                return;
+            }
+
+            _animator.applyRootMotion = true;
 
             // Hash the state names once
             _idleHash = Animator.StringToHash("Idle");
@@ -184,6 +193,10 @@ namespace Player
             return InGuardWalkForwardHash;
         }
 
+        [Header("Diagnostics")]
+        [Tooltip("Temporary: logs the inputs and computed facing used by UpdateMovementDirection.")]
+        [SerializeField] private bool _logMovementDirection;
+
         private void UpdateMovementDirection()
         {
             if (_isTargeting && _targetingTarget != null)
@@ -194,10 +207,42 @@ namespace Player
             Vector3 worldMoveDir = _camera.GetCameraRelativeMoveDirection(_direction);
 
             Quaternion targetRotation = Quaternion.LookRotation(worldMoveDir, Vector3.up);
+
+            if (_logMovementDirection)
+            {
+                var camTransform = _camera != null ? _camera.CameraTransform : null;
+                Debug.Log(
+                    $"[MoveDir] cam='{(_camera == null ? "NULL PlayerCamera" : _camera.name)}'" +
+                    $" camTf='{(camTransform == null ? "NULL camera" : camTransform.name)}'" +
+                    $" camFwd={(camTransform == null ? "n/a" : camTransform.forward.ToString("F3"))}" +
+                    $" input=({_direction.x:F2},{_direction.y:F2})" +
+                    $" worldMoveDir={worldMoveDir.ToString("F3")}" +
+                    $" targetYaw={targetRotation.eulerAngles.y:F1}" +
+                    $" currentYaw={_transform.eulerAngles.y:F1}",
+                    this);
+            }
+
             _transform.rotation = Quaternion.Slerp(_transform.rotation, targetRotation, _rotationSpeed * Time.fixedDeltaTime);
 
             // No need to feed blend tree parameters anymore;
             // the direction is only used for rotation, root motion handles forward movement.
+        }
+
+        /// <summary>
+        /// Everything except the ground layer and this object's own layer. Excluding our own layer is
+        /// essential: the sweep starts inside our own collider, and a self-hit reports distance 0.
+        /// </summary>
+        private LayerMask DeriveCollisionMask(int groundLayerIndex)
+        {
+            var mask = ~0;
+            if (groundLayerIndex >= 0)
+                mask &= ~(1 << groundLayerIndex);
+
+            var ownLayer = gameObject.layer;
+            if (ownLayer >= 0)
+                mask &= ~(1 << ownLayer);
+
+            return mask;
         }
 
         private void HandleGravityAndGrounding()
@@ -207,7 +252,30 @@ namespace Player
             Vector3 startPoint = capsuleBottom + Vector3.up * _capsuleRadius;
             float maxDistance = _capsuleRadius + _groundCheckDistance + 0.05f;
 
-            if (Physics.SphereCast(startPoint, _capsuleRadius, Vector3.down, out RaycastHit hit, maxDistance, _groundLayer))
+            var hitGround = Physics.SphereCast(
+                startPoint, _capsuleRadius, Vector3.down, out RaycastHit hit, maxDistance, _groundLayer);
+
+            if (_logMovementDirection)
+            {
+                // A Raycast from well above catches ground that sits above us, and an OverlapSphere
+                // catches geometry we are already embedded inside - SphereCast alone reports neither.
+                Physics.Raycast(startPoint + Vector3.up * 50f, Vector3.down, out var farHit, 200f, _groundLayer);
+                var embedded = Physics.OverlapSphere(startPoint, _capsuleRadius, _groundLayer, QueryTriggerInteraction.Collide);
+                var embeddedNames = embedded.Length == 0
+                    ? "none"
+                    : string.Join(",", System.Array.ConvertAll(embedded, c => $"{c.name}@{c.gameObject.layer}"));
+
+                Debug.Log(
+                    $"[Ground] grounded={_isGrounded} vVel={_verticalVelocity:F2}" +
+                    $" pos={_transform.position.ToString("F2")}" +
+                    $" start={startPoint.ToString("F3")} radius={_capsuleRadius:F3} maxDist={maxDistance:F3}" +
+                    $" mask={_groundLayer.value} hit={hitGround}" +
+                    $" worldHitAbove={(farHit.collider != null ? $"{farHit.collider.name}@{farHit.collider.gameObject.layer} y={farHit.point.y:F2}" : "NONE")}" +
+                    $" embedded={embeddedNames}",
+                    this);
+            }
+
+            if (hitGround)
             {
                 float desiredBottomY = hit.point.y + _capsuleRadius;
                 float currentBottomY = capsuleBottom.y;
@@ -338,8 +406,6 @@ namespace Player
 
         private void MoveInput(float x, float y)
         {
-            _vertical = y;
-            _horizontal = x;
             _moveAmount = Mathf.Clamp01(Mathf.Abs(x) + Mathf.Abs(y));
         }
 

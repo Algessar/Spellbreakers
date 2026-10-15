@@ -6,14 +6,18 @@ namespace Player
 {
     public class PlayerCamera : MonoBehaviour
     {
-        private InputHandler _input;
         [SerializeField] private Camera _camera;
-        public Vector3 cameraDirection;
 
-        // private void OnValidate()
-        // {
-        //     _camera = Camera.main;
-        // }
+        /// <summary>The transform whose forward/right define movement space, or null if unassigned.</summary>
+        public Transform CameraTransform => _camera != null ? _camera.transform : null;
+
+        /// <summary>Latest raw look input, in case another system wants to read it.</summary>
+        public Vector2 cameraDirection;
+
+        private void Awake()
+        {
+            if (!_camera) _camera = Camera.main;
+        }
 
         public void OnLook(InputAction.CallbackContext ctx)
         {
@@ -24,7 +28,7 @@ namespace Player
         {
             if (!_camera)
             {
-                Debug.LogWarning("PlayerCamera: No camera assigned. Falling back to world‑space direction.");
+                Debug.LogWarning("PlayerCamera: No camera assigned. Falling back to world-space direction.");
                 return new Vector3(moveInput.x, 0f, moveInput.y).normalized;
             }
 
@@ -38,7 +42,5 @@ namespace Player
             // Clamp magnitude and normalise to avoid faster diagonal movement
             return Vector3.ClampMagnitude(worldDirection, 1f).normalized;
         }
-        
-        
     }
 }
