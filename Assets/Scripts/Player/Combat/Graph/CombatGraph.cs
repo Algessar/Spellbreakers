@@ -30,7 +30,10 @@ public sealed class CombatGraph
     public bool CompleteTransition(GuardTransition transition)
     {
         if (!IsTransitioning || transition.From != CurrentGuard)
+        {
+            IsTransitioning = false;
             return false;
+        }
 
         CurrentGuard = transition.To;
         IsTransitioning = false;
@@ -40,6 +43,18 @@ public sealed class CombatGraph
     public void CancelTransition()
     {
         IsTransitioning = false;
+    }
+}
+
+namespace Player
+{
+    /// <summary>Observable animation phases for combat systems such as pass-time IK.</summary>
+    public enum PassPhase
+    {
+        None,
+        ToPass,
+        Strike,
+        Settle
     }
 }
 

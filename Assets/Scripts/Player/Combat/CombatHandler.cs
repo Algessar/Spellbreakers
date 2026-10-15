@@ -1,164 +1,192 @@
+using System;
 using System.Collections;
 using Player;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-[RequireComponent(typeof(TargetingSystem))]
+[DisallowMultipleComponent]
 public sealed class CombatHandler : MonoBehaviour
 {
     public float BlendDuration = 0.12f;
-    public float blendDuration => BlendDuration;
-
-    [SerializeField] private Animator _animator;
     [SerializeField] private string _initialGuard = "VomTag";
-    [SerializeField, Min(0f)] private float _langortForwardDistance = 0.75f;
+    [SerializeField, Min(0.5f)] private float _passTimeoutSeconds = 5f;
 
-    private int _passLayer = -1;
+    private Animator _animator;
     private CombatGraph _combatGraph;
-    private Movement_V3 _movement;
-    private TargetingSystem _targetingSystem;
     private Coroutine _transitionRoutine;
     private string _queuedGuard;
+    private int _guardsLayer;
+    private int _passesLayer;
+    private bool _initialized;
 
-    private static readonly int LangortState = Animator.StringToHash("Langort");
-    
-    
-    private IEnumerator Start()
+    public event Action<PassPhase> PhaseChanged;
+    public PassPhase Phase { get; private set; }
+
+    private void Awake()
     {
-        if (_animator == null)
-            _animator = GetComponent<Animator>();
-
+        _animator = GetComponentInChildren<Animator>(true);
         if (_animator == null)
         {
-            Debug.LogError("CombatHandler could not find an Animator on this character or its children.", this);
+            Debug.LogError("CombatHandler requires an Animator on this object or a child.", this);
             enabled = false;
-            yield break;
+            return;
         }
 
-        _movement = GetComponent<Movement_V3>();
-        _targetingSystem = GetComponent<TargetingSystem>();
-        if (_movement == null)
-            _movement = GetComponentInParent<Movement_V3>();
-        if (_movement == null)
-            _movement = GetComponentInChildren<Movement_V3>(true);
+        TargetingSystem.GetOrAddForAnimator(_animator);
+    }
 
-        // Movement_V3 assigns the shared controller from Start; resolve the layer afterward.
+    private void Start()
+    {
+        StartCoroutine(InitializeAfterControllerAssignment());
+    }
+
+    private IEnumerator InitializeAfterControllerAssignment()
+    {
+        // Preserve the previous one-frame delay for any runtime Animator controller assignment.
         yield return null;
-
-        _passLayer = _animator.GetLayerIndex("Passes");
-        if (_passLayer < 0)
+        _guardsLayer = _animator.GetLayerIndex("Guards");
+        _passesLayer = _animator.GetLayerIndex("Passes");
+        if (_guardsLayer < 0 || _passesLayer < 0 ||
+            !_animator.HasState(_guardsLayer, Animator.StringToHash("Guards." + _initialGuard)) ||
+            !_animator.HasState(_passesLayer, Animator.StringToHash("Passes.Langort")))
         {
-            Debug.LogError("CombatHandler could not find the Passes Animator layer.", this);
+            Debug.LogError("CombatHandler needs Guards and Passes layers with the selected guard and Passes.Langort states.", this);
             enabled = false;
             yield break;
         }
 
         _combatGraph = new CombatGraph(_initialGuard);
+        _animator.SetLayerWeight(_guardsLayer, 1f);
+        _animator.SetLayerWeight(_passesLayer, 0f);
+        _animator.Play("Guards." + _initialGuard, _guardsLayer, 0f);
+        _initialized = true;
     }
 
     private void OnDisable()
     {
         if (_transitionRoutine != null)
+        {
             StopCoroutine(_transitionRoutine);
+            _transitionRoutine = null;
+        }
 
-        _transitionRoutine = null;
         _queuedGuard = null;
-        _targetingSystem?.SetGuardPassAimActive(false);
-        _combatGraph?.CancelTransition();
+        if (_initialized && _animator != null)
+        {
+            _combatGraph?.CancelTransition();
+            var guard = _combatGraph != null ? _combatGraph.CurrentGuard : _initialGuard;
+            if (_animator.HasState(_guardsLayer, Animator.StringToHash("Guards." + guard)))
+                _animator.Play("Guards." + guard, _guardsLayer, 0f);
+            _animator.SetLayerWeight(_guardsLayer, 1f);
+            _animator.SetLayerWeight(_passesLayer, 0f);
+        }
+
+        SetPhase(PassPhase.None);
     }
 
-    public void OnVomTag(InputAction.CallbackContext context)
-    {
-        if (context.started) RequestGuard("VomTag");
-    }
+    public void OnVomTag(InputAction.CallbackContext context) { if (context.started) RequestGuard("VomTag"); }
+    public void OnPflug(InputAction.CallbackContext context) { if (context.started) RequestGuard("Pflug"); }
+    public void OnAlber(InputAction.CallbackContext context) { if (context.started) RequestGuard("Alber"); }
+    public void OnOchs(InputAction.CallbackContext context) { if (context.started) RequestGuard("Ochs"); }
+    public void OnIronGate(InputAction.CallbackContext context) { if (context.started) RequestGuard("IronGate"); }
 
-    public void OnAlber(InputAction.CallbackContext context)
+    private void RequestGuard(string guard)
     {
-        if (context.started) RequestGuard("Alber");
-    }
-
-    public void OnPflug(InputAction.CallbackContext context)
-    {
-        if (context.started) RequestGuard("Pflug");
-    }
-
-    public void OnOchs(InputAction.CallbackContext context)
-    {
-        if (context.started) RequestGuard("Ochs");
-    }
-
-    public void OnIronGate(InputAction.CallbackContext context)
-    {
-        if (context.started) RequestGuard("IronGate");
-    }
-
-    private void RequestGuard(string destination)
-    {
-        if (_combatGraph == null)
+        if (!_initialized || !_animator.HasState(_guardsLayer, Animator.StringToHash("Guards." + guard)))
             return;
 
         if (_combatGraph.IsTransitioning)
         {
-            _queuedGuard = destination;
+            _queuedGuard = guard;
             return;
         }
 
-        BeginTransition(destination);
-    }
-
-    private void BeginTransition(string destination)
-    {
-        if (_combatGraph.TryBeginTransition(destination, out var transition))
+        if (_combatGraph.TryBeginTransition(guard, out var transition))
             _transitionRoutine = StartCoroutine(PlayTransition(transition));
     }
 
     private IEnumerator PlayTransition(GuardTransition transition)
     {
-        _targetingSystem?.SetGuardPassAimActive(false);
-        var passPath = Animator.StringToHash($"Passes.{transition.PassThrough}");
-        _animator.CrossFadeInFixedTime(passPath, BlendDuration, _passLayer);
+        SetPhase(PassPhase.ToPass);
+        _animator.Play("Passes.Langort", _passesLayer, 0f);
+        yield return BlendPassLayer(1f);
 
-        // Time a scripted forward step to the Langort clip while the Base Layer keeps locomotion running.
-        AnimatorStateInfo state;
-        do
+        SetPhase(PassPhase.Strike);
+        var startTime = Time.time;
+        while (_animator.GetCurrentAnimatorStateInfo(_passesLayer).shortNameHash != Animator.StringToHash("Langort"))
         {
-            yield return null;
-            state = _animator.GetCurrentAnimatorStateInfo(_passLayer);
-        }
-        while (state.shortNameHash != LangortState);
-
-        _targetingSystem?.SetGuardPassAimActive(true);
-
-        _movement?.AdvanceDuringGuardTransition(_langortForwardDistance, state.length);
-
-        // Wait for the Langort pass to finish. This uses Animator state time, not an Animation Event.
-        while (true)
-        {
-            state = _animator.GetCurrentAnimatorStateInfo(_passLayer);
-            if (state.shortNameHash == LangortState &&
-                !_animator.IsInTransition(_passLayer) &&
-                state.normalizedTime >= 1f)
+            if (Time.time - startTime > _passTimeoutSeconds)
             {
-                break;
+                AbortTransition(transition, "Passes.Langort did not become the active state.");
+                yield break;
             }
-
             yield return null;
         }
 
-        _targetingSystem?.SetGuardPassAimActive(false);
-        var destinationPath = Animator.StringToHash($"Passes.{transition.To}");
-        _animator.CrossFadeInFixedTime(destinationPath, BlendDuration, _passLayer);
-        yield return new WaitForSeconds(BlendDuration);
-
-        _combatGraph.CompleteTransition(transition);
-        _transitionRoutine = null;
-
-        if (!string.IsNullOrEmpty(_queuedGuard))
+        while (_animator.GetCurrentAnimatorStateInfo(_passesLayer).normalizedTime < 1f)
         {
-            var queuedGuard = _queuedGuard;
-            _queuedGuard = null;
-            BeginTransition(queuedGuard);
+            if (Time.time - startTime > _passTimeoutSeconds)
+            {
+                AbortTransition(transition, "Passes.Langort exceeded its timeout.");
+                yield break;
+            }
+            yield return null;
         }
+
+        SetPhase(PassPhase.Settle);
+        _animator.Play("Guards." + transition.To, _guardsLayer, 0f);
+        yield return BlendPassLayer(0f);
+
+        if (!_combatGraph.CompleteTransition(transition))
+        {
+            AbortTransition(transition, "Combat graph rejected the completed transition.");
+            yield break;
+        }
+
+        SetPhase(PassPhase.None);
+        _transitionRoutine = null;
+        var queued = _queuedGuard;
+        _queuedGuard = null;
+        if (!string.IsNullOrEmpty(queued))
+            RequestGuard(queued);
     }
 
+    private IEnumerator BlendPassLayer(float targetWeight)
+    {
+        var startWeight = _animator.GetLayerWeight(_passesLayer);
+        if (BlendDuration <= 0f)
+        {
+            _animator.SetLayerWeight(_passesLayer, targetWeight);
+            yield break;
+        }
+
+        var elapsed = 0f;
+        while (elapsed < BlendDuration)
+        {
+            elapsed += Time.deltaTime;
+            _animator.SetLayerWeight(_passesLayer, Mathf.Lerp(startWeight, targetWeight, elapsed / BlendDuration));
+            yield return null;
+        }
+        _animator.SetLayerWeight(_passesLayer, targetWeight);
+    }
+
+    private void AbortTransition(GuardTransition transition, string reason)
+    {
+        Debug.LogWarning("Guard transition was cancelled: " + reason, this);
+        _combatGraph.CancelTransition();
+        _queuedGuard = null;
+        _animator.SetLayerWeight(_passesLayer, 0f);
+        _animator.SetLayerWeight(_guardsLayer, 1f);
+        _animator.Play("Guards." + transition.From, _guardsLayer, 0f);
+        _transitionRoutine = null;
+        SetPhase(PassPhase.None);
+    }
+
+    private void SetPhase(PassPhase phase)
+    {
+        if (Phase == phase)
+            return;
+        Phase = phase;
+        PhaseChanged?.Invoke(phase);
+    }
 }

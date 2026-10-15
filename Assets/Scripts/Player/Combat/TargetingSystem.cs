@@ -28,6 +28,7 @@ namespace Player
         private Animator _animator;
         private Transform _playerRoot;
         private Transform _currentTarget;
+      
         private Damageable _currentDamageable;
         private Vector3 _currentAimPoint;
         private float _nextTargetRefreshTime;
@@ -37,9 +38,29 @@ namespace Player
         private Transform _leftHand;
         private WeaponDamage _weaponDamage;
         private bool _guardPassAimActive;
+        private CombatHandler _combatHandler;
 
         public bool IsTargeting { get; private set; }
-        public Transform CurrentTarget => _currentTarget;
+        [field: SerializeField] public Transform CurrentTarget => _currentTarget;
+        public Transform TargetCurrent;
+
+        public static TargetingSystem GetOrAddForAnimator(Animator animator)
+        {
+            if (animator == null)
+                return null;
+
+            var targeting = animator.GetComponentInParent<TargetingSystem>();
+            if (targeting == null)
+                targeting = animator.gameObject.AddComponent<TargetingSystem>();
+
+            if (targeting.gameObject != animator.gameObject &&
+                animator.GetComponent<TargetingIKRelay>() == null)
+            {
+                animator.gameObject.AddComponent<TargetingIKRelay>();
+            }
+
+            return targeting;
+        }
 
         private void Awake()
         {
@@ -72,6 +93,16 @@ namespace Player
                 _viewCamera = GetComponentInChildren<Camera>(true);
             if (_viewCamera == null)
                 _viewCamera = Camera.main;
+
+            _combatHandler = GetComponentInParent<CombatHandler>();
+        }
+
+        private void OnEnable()
+        {
+            if (_combatHandler == null)
+                _combatHandler = GetComponentInParent<CombatHandler>();
+            if (_combatHandler != null)
+                _combatHandler.PhaseChanged += HandlePassPhaseChanged;
         }
 
         private void Update()
@@ -98,10 +129,14 @@ namespace Player
                 _swordAimWeightCurrent,
                 _currentTarget ? _swordAimWeight : 0f,
                 _swordAimBlendSpeed * Time.deltaTime);
+
+            if(_currentTarget) TargetCurrent = _currentTarget;
         }
 
         private void OnDisable()
         {
+            if (_combatHandler != null)
+                _combatHandler.PhaseChanged -= HandlePassPhaseChanged;
             IsTargeting = false;
             _guardPassAimActive = false;
             ClearTarget();
@@ -191,7 +226,7 @@ namespace Player
             ref Vector3 bestAimPoint,
             ref float bestScore)
         {
-            if (target == null || target == _playerRoot || target.IsChildOf(_playerRoot) ||
+            if (!target || target == _playerRoot || target.IsChildOf(_playerRoot) ||
                 !_consideredTargets.Add(target) || (damageable != null && damageable.IsDead))
             {
                 return;
@@ -203,7 +238,7 @@ namespace Player
             if (distance <= 0.01f || distance > _acquisitionRange)
                 return;
 
-            var viewForward = _viewCamera != null ? _viewCamera.transform.forward : _playerRoot.forward;
+            var viewForward = _viewCamera ? _viewCamera.transform.forward : _playerRoot.forward;
             var angle = Vector3.Angle(viewForward, offset);
             if (angle > _acquisitionAngle * 0.5f)
                 return;
@@ -221,6 +256,8 @@ namespace Player
 
         private static Vector3 GetAimPoint(Transform target)
         {
+            
+            
             var colliders = target.GetComponentsInChildren<Collider>(true);
             var hasBounds = false;
             var bounds = default(Bounds);
@@ -260,13 +297,18 @@ namespace Player
             _currentAimPoint = default;
         }
 
-        public void SetGuardPassAimActive(bool active)
+        private void HandlePassPhaseChanged(PassPhase phase)
         {
-            _guardPassAimActive = active;
+            _guardPassAimActive = phase == PassPhase.Strike;
         }
 
         // The Passes layer has IK Pass enabled so the pose correction is applied after its animation.
         private void OnAnimatorIK(int layerIndex)
+        {
+            ProcessAnimatorIK(layerIndex);
+        }
+
+        internal void ProcessAnimatorIK(int layerIndex)
         {
             if (_animator == null)
                 return;

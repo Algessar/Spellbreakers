@@ -1530,7 +1530,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7336534db6a666e44912ccbfbb576b14, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Movement_V3
-  _controller: {fileID: 9100000, guid: 756ed1e039128cd47ab2a6b7d74c092d, type: 2}
   _vertical: 0
   _horizontal: 0
   _moveAmount: 0
@@ -1585,11 +1584,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ff7a1155fcd2c884ab6ad4fbadce22d1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CombatHandler
-  Weapon: {fileID: 4083561186359985684}
-  MainHand: {fileID: 6951188310537787448}
-  _animator: {fileID: 0}
   _initialGuard: VomTag
-  _langortForwardDistance: 0.75
 --- !u!114 &8114119638361260205
 MonoBehaviour:
   m_ObjectHideFlags: 0

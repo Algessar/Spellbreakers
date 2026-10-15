@@ -20,7 +20,7 @@ namespace Player
         private CombatHandler _combat;
         private TargetingSystem _targeting;
 
-        private void Start()
+        private void OnEnable()
         {
             _actions = new Actions();
             _actions.Player.Enable();
@@ -34,44 +34,66 @@ namespace Player
 
             // Animator IK callbacks run on the Animator's GameObject.
             var animator = GetComponentInChildren<Animator>(true);
-            var targetingHost = animator != null ? animator.gameObject : gameObject;
-            _targeting = targetingHost.GetComponent<TargetingSystem>();
-            if (_targeting == null)
-                _targeting = targetingHost.AddComponent<TargetingSystem>();
+            _targeting = TargetingSystem.GetOrAddForAnimator(animator);
             
-            _actions.Player.Move.performed   += _move3.OnMove;
-            _actions.Player.Move.canceled    += _move3.OnMove;
+            if (_move3 != null)
+            {
+                _actions.Player.Move.performed += _move3.OnMove;
+                _actions.Player.Move.canceled += _move3.OnMove;
+            }
   
-            _actions.Player.Look.performed   += _camera.OnLook;
-            _actions.Player.Look.canceled    += _camera.OnLook;
+            if (_camera != null)
+            {
+                _actions.Player.Look.performed += _camera.OnLook;
+                _actions.Player.Look.canceled += _camera.OnLook;
+            }
             
             //Combat stuff
 
-            _actions.Player.VomTag.started   += _combat.OnVomTag;
-            _actions.Player.Pflug.started    += _combat.OnPflug;
-            _actions.Player.Alber.started    += _combat.OnAlber;
-            _actions.Player.Ochs.started     += _combat.OnOchs;
-            _actions.Player.IronGate.started += _combat.OnIronGate;
-            _actions.Player.SwitchTarget.started += _targeting.ToggleTargeting;
+            if (_combat != null)
+            {
+                _actions.Player.VomTag.started += _combat.OnVomTag;
+                _actions.Player.Pflug.started += _combat.OnPflug;
+                _actions.Player.Alber.started += _combat.OnAlber;
+                _actions.Player.Ochs.started += _combat.OnOchs;
+                _actions.Player.IronGate.started += _combat.OnIronGate;
+            }
+            if (_targeting != null)
+                _actions.Player.SwitchTarget.started += _targeting.ToggleTargeting;
         }
 
         private void OnDisable()
         {
-            _actions.Player.Move.performed   -= _move3.OnMove;
-            _actions.Player.Move.canceled    -= _move3.OnMove; 
-            _actions.Player.Look.performed   -= _camera.OnLook;
-            _actions.Player.Look.canceled    -= _camera.OnLook;
+            if (_actions == null)
+                return;
+
+            if (_move3 != null)
+            {
+                _actions.Player.Move.performed -= _move3.OnMove;
+                _actions.Player.Move.canceled -= _move3.OnMove;
+            }
+            if (_camera != null)
+            {
+                _actions.Player.Look.performed -= _camera.OnLook;
+                _actions.Player.Look.canceled -= _camera.OnLook;
+            }
             
-            _actions.Player.VomTag.started   -= _combat.OnVomTag;
-            _actions.Player.Pflug.started    -= _combat.OnPflug;
-            _actions.Player.Alber.started    -= _combat.OnAlber;
-            _actions.Player.Ochs.started     -= _combat.OnOchs;
-            _actions.Player.IronGate.started -= _combat.OnIronGate;
-            _actions.Player.SwitchTarget.started -= _targeting.ToggleTargeting;
+            if (_combat != null)
+            {
+                _actions.Player.VomTag.started -= _combat.OnVomTag;
+                _actions.Player.Pflug.started -= _combat.OnPflug;
+                _actions.Player.Alber.started -= _combat.OnAlber;
+                _actions.Player.Ochs.started -= _combat.OnOchs;
+                _actions.Player.IronGate.started -= _combat.OnIronGate;
+            }
+            if (_targeting != null)
+                _actions.Player.SwitchTarget.started -= _targeting.ToggleTargeting;
             _targeting?.StopTargeting();
 
 
             _actions.Disable();
+            _actions.Dispose();
+            _actions = null;
         }
     }
 }

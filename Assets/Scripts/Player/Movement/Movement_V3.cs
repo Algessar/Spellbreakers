@@ -1,4 +1,3 @@
-using UnityEditor.Animations;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Quaternion = UnityEngine.Quaternion;
@@ -17,7 +16,6 @@ namespace Player
         private static readonly int InGuardWalkBackwardHash = Animator.StringToHash("InGuard-WalkBackward");
      
         private Animator _animator;
-        [SerializeField] private AnimatorController _controller;
         private CapsuleCollider _capsule;
         private Transform _transform;
 
@@ -29,9 +27,6 @@ namespace Player
         private int _walkHash;
         private int _runHash;
         private int _currentStateHash;   // track current state to avoid repeated CrossFade calls
-        private Vector3 _guardTransitionDirection;
-        private float _guardTransitionDistanceRemaining;
-        private float _guardTransitionTimeRemaining;
         private bool _isTargeting;
         private Transform _targetingTarget;
         private float _targetFacingStartTime;
@@ -85,7 +80,6 @@ namespace Player
             
             
             _camera = GetComponent<PlayerCamera>();
-            // _animator.runtimeAnimatorController = _controller;
 
             _animator.applyRootMotion = true;   // DON'T TOUCH THIS
 
@@ -140,7 +134,7 @@ namespace Player
         {
             int targetHash;
 
-            if (_isTargeting)
+            if (_isTargeting && _targetingTarget != null)
             {
                 targetHash = GetTargetingMovementState();
             }
@@ -192,7 +186,7 @@ namespace Player
 
         private void UpdateMovementDirection()
         {
-            if (_isTargeting)
+            if (_isTargeting && _targetingTarget != null)
                 return;
 
             if (!_isMoving || _direction == Vector2.zero) return;
@@ -247,34 +241,14 @@ namespace Player
         {
             Vector3 deltaRootMotion = _animator.deltaPosition;
             Vector3 horizontalMovement = new Vector3(deltaRootMotion.x, 0, deltaRootMotion.z);
-            Vector3 guardTransitionMovement = Vector3.zero;
-            if (_guardTransitionTimeRemaining > 0f && _guardTransitionDistanceRemaining > 0f)
-            {
-                float stepDuration = Mathf.Min(Time.fixedDeltaTime, _guardTransitionTimeRemaining);
-                float stepDistance = _guardTransitionDistanceRemaining * (stepDuration / _guardTransitionTimeRemaining);
-                guardTransitionMovement = _guardTransitionDirection * stepDistance;
-                _guardTransitionDistanceRemaining -= stepDistance;
-                _guardTransitionTimeRemaining -= stepDuration;
-            }
-
             Vector3 verticalMovement = Vector3.up * (_verticalVelocity * Time.fixedDeltaTime);
-            Vector3 desiredMovement = horizontalMovement + guardTransitionMovement + verticalMovement;
+            Vector3 desiredMovement = horizontalMovement + verticalMovement;
 
             if (desiredMovement.sqrMagnitude < 0.0001f)
                 return;
 
             Vector3 finalPosition = ResolveCapsuleCollision(_transform.position, desiredMovement);
             _transform.position = finalPosition;
-        }
-
-        public void AdvanceDuringGuardTransition(float distance, float duration)
-        {
-            if (distance <= 0f || duration <= 0f)
-                return;
-
-            _guardTransitionDirection = _transform.forward;
-            _guardTransitionDistanceRemaining = distance;
-            _guardTransitionTimeRemaining = duration;
         }
 
         public void SetTargeting(bool targetingEnabled, Transform target)
