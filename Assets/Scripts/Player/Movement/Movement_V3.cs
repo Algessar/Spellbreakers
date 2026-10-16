@@ -250,7 +250,11 @@ namespace Player
             Vector3 capsuleBottom = GetCapsuleBottom();
 
             Vector3 startPoint = capsuleBottom + Vector3.up * _capsuleRadius;
-            float maxDistance = _capsuleRadius + _groundCheckDistance + 0.05f;
+
+            // Look at least as far down as this frame's fall will travel, so a fast fall can never
+            // tunnel past the ground between checks.
+            float fallStep = Mathf.Max(0f, -_verticalVelocity) * Time.fixedDeltaTime;
+            float maxDistance = _capsuleRadius + _groundCheckDistance + 0.05f + fallStep;
 
             var hitGround = Physics.SphereCast(
                 startPoint, _capsuleRadius, Vector3.down, out RaycastHit hit, maxDistance, _groundLayer);
