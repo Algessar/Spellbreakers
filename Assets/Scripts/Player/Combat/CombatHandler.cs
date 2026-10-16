@@ -153,6 +153,29 @@ public sealed class CombatHandler : MonoBehaviour
         return Agent.RequestGuard(guard, _opponentDistance);
     }
 
+    /// <summary>
+    /// Brings a dead character back, posed in its initial guard. Respawning owns the decision of when;
+    /// this only tells the agent to stop being dead so the rules accept input again.
+    /// </summary>
+    public void Revive()
+    {
+        if (!_initialized || Agent == null)
+            return;
+
+        Agent.Revive(_initialGuard);
+
+        // The guard pose has to be re-asserted: while dead the agent never changed Current, so the
+        // rendered guard is already correct, but the layer weights may have been left mid-transition.
+        if (HasGuardState(Agent.Current))
+        {
+            _animator.Play(GuardStateHash(Agent.Current), _guardsLayer, 0f);
+            _renderedGuard = Agent.Current;
+        }
+
+        _passWeight = 0f;
+        _animator.SetLayerWeight(_passesLayer, 0f);
+    }
+
     /// <summary>Puts this character into a reaction state, freezing its combat clock for a moment.</summary>
     public void ApplyReaction(ReactionState state, float seconds)
     {

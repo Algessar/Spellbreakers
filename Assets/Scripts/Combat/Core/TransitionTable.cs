@@ -132,7 +132,7 @@ namespace Spellbreakers.Combat
             float damageEnd = 0.62f,
             float lunge = 0.75f,
             float maxDistance = 2.6f,
-            string passState = null)
+            string passState = "Langort")
         {
             return new TransitionProfile(from, to, direction, duration, damageStart, damageEnd)
             {
@@ -140,7 +140,7 @@ namespace Spellbreakers.Combat
                 LungeDistance = lunge,
                 MaxDistance = maxDistance,
                 MinDistance = 0f,
-                PassStateName = passState ?? TransitionProfile.ResolveDefaultPassStateName(direction),
+                PassStateName = passState,
             };
         }
 
@@ -162,7 +162,7 @@ namespace Spellbreakers.Combat
         }
 
         /// <summary>
-        /// The canonical table: 18 attacks and 4 recoveries, which is 22 transitions over 6 guards.
+        /// The canonical table: 22 attacks and 4 recoveries, which is 26 transitions over 6 guards.
         ///
         /// Reach and parry grace come from how each guard actually sits; the attack set is the small,
         /// readable subset of the Lichtenauer plays this game supports.
@@ -207,7 +207,21 @@ namespace Spellbreakers.Combat
             // --- From Langort: the long point, then finishing cuts. ---
             AddOrThrow(table, Attack(GuardId.Langort, GuardId.Alber, TransitionDirection.Oberhau, duration: 0.40f, lunge: 0.5f));
 
-            // --- Iron Gate is carried for the rig; kept to a thrust and a cut. ---
+            // --- Into Iron Gate: it is a standing guard with its own input binding, so every guard the
+            // player can actually hold has to be able to drop into it. Without these the only inbound
+            // edge was the Langort recovery - and Langort is a pass-through pose, not a guard you can
+            // stand in - which left Iron Gate unreachable in play despite being bound and having its own
+            // Animator state.
+            AddOrThrow(table, Attack(GuardId.VomTag, GuardId.IronGate, TransitionDirection.Oberhau,
+                duration: 0.44f, lunge: 0.6f));
+            AddOrThrow(table, Attack(GuardId.Pflug, GuardId.IronGate, TransitionDirection.Thrust,
+                duration: 0.34f, lunge: 0.5f));
+            AddOrThrow(table, Attack(GuardId.Alber, GuardId.IronGate, TransitionDirection.Thrust,
+                duration: 0.38f, lunge: 0.6f));
+            AddOrThrow(table, Attack(GuardId.Ochs, GuardId.IronGate, TransitionDirection.Oberhau,
+                duration: 0.42f, lunge: 0.6f));
+
+            // --- From Iron Gate: kept to a thrust and a cut. ---
             AddOrThrow(table, Attack(GuardId.IronGate, GuardId.Langort, TransitionDirection.Thrust, duration: 0.36f));
             AddOrThrow(table, Attack(GuardId.IronGate, GuardId.Alber, TransitionDirection.Oberhau, duration: 0.44f));
 

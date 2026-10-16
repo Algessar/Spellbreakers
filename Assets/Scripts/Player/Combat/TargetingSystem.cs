@@ -43,6 +43,12 @@ namespace Player
         public Transform CurrentTarget => _currentTarget;
 
         /// <summary>
+        /// How far auto-acquisition looks. Exposed so a debug view can draw the boundary the player is
+        /// actually being held to, rather than a second guess at it.
+        /// </summary>
+        public float AcquisitionRange => _acquisitionRange;
+
+        /// <summary>
         /// The last target this system settled on, surviving a momentary loss of validity. Read-only:
         /// it used to be a public field written from a tick, which read as an inter-component channel
         /// but was really just leaked state.
@@ -235,7 +241,7 @@ namespace Player
             _currentDamageable = bestDamageable;
             _movement?.SetTargeting(IsTargeting, _currentTarget);
 
-            if (_combatHandler != null)
+            if (_combatHandler)
             {
                 _combatHandler.SetOpponentDistance(
                     _currentTarget ? Vector3.Distance(_playerRoot.position, _currentTarget.position) : float.PositiveInfinity);
@@ -251,12 +257,12 @@ namespace Player
             ref float bestScore)
         {
             if (!target || target == _playerRoot || target.IsChildOf(_playerRoot) ||
-                !_consideredTargets.Add(target) || (damageable != null && damageable.IsDead))
+                !_consideredTargets.Add(target) || (damageable && damageable.IsDead))
             {
                 return;
             }
 
-            var aimPoint = damageable != null ? damageable.AimPosition : GetAimPoint(target);
+            var aimPoint = damageable ? damageable.AimPosition : GetAimPoint(target);
             var offset = aimPoint - origin;
             var distance = offset.magnitude;
             if (distance <= 0.01f || distance > _acquisitionRange)
@@ -285,7 +291,7 @@ namespace Player
 
             foreach (var targetCollider in colliders)
             {
-                if (targetCollider == null || !targetCollider.enabled || targetCollider.isTrigger)
+                if (!targetCollider || !targetCollider.enabled || targetCollider.isTrigger)
                     continue;
 
                 if (hasBounds)

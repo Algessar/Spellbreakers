@@ -112,7 +112,7 @@ namespace Spellbreakers.Ai
 
         private void Update()
         {
-            if (Brain == null || Agent == null)
+            if (Brain == null || Agent == null || !Agent.IsAlive)
                 return;
 
             var deltaTime = Time.deltaTime;
@@ -213,9 +213,11 @@ namespace Spellbreakers.Ai
 
         private void OnDied(Damageable damageable)
         {
+            // The brain is kept rather than discarded: tearing it down here left a respawned enemy
+            // permanently inert, because nothing rebuilds it. The agent's Dead reaction is what stops
+            // it acting, and that is now something a respawn can clear.
             Agent?.SetReaction(ReactionState.Dead);
             _locomotion?.Stop();
-            Brain = null;
         }
 
         /// <summary>

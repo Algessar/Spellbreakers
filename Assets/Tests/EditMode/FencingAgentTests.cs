@@ -125,16 +125,36 @@ namespace Spellbreakers.Tests
             Assert.That(agent.IsTransitioning, Is.False);
         }
 
-        /// <summary>Iron Gate is not in the language from Vom Tag, so the table - not a special case -
-        /// must be what refuses it.</summary>
+        /// <summary>Iron Gate settles back into Langort or Alber but not into Vom Tag, so the table -
+        /// not a special case - must be what refuses that pair.</summary>
         [Test]
         public void RequestGuard_RejectsAPairTheTableDoesNotAuthor()
         {
-            var agent = NewAgent();
+            var agent = NewAgent(GuardId.IronGate);
 
-            Assert.That(agent.RequestGuard(GuardId.IronGate, GenerousDistance), Is.EqualTo(RequestResult.Rejected));
-            Assert.That(agent.Table.TryGet(StartGuard, GuardId.IronGate, out _), Is.False);
+            Assert.That(agent.RequestGuard(GuardId.VomTag, GenerousDistance), Is.EqualTo(RequestResult.Rejected));
+            Assert.That(agent.Table.TryGet(GuardId.IronGate, GuardId.VomTag, out _), Is.False);
             Assert.That(agent.IsTransitioning, Is.False);
+        }
+
+        /// <summary>
+        /// Iron Gate is a standing guard with its own binding, so every guard the player can hold must
+        /// be able to reach it. Its only inbound edge used to be the Langort recovery, and since Langort
+        /// is a pass-through pose rather than a guard you can stand in, the key did nothing at all.
+        /// </summary>
+        [TestCase(GuardId.VomTag)]
+        [TestCase(GuardId.Pflug)]
+        [TestCase(GuardId.Alber)]
+        [TestCase(GuardId.Ochs)]
+        public void RequestGuard_CanEnterIronGateFromEveryStandingGuard(GuardId from)
+        {
+            var agent = NewAgent(from);
+
+            Assert.That(agent.RequestGuard(GuardId.IronGate, GenerousDistance), Is.EqualTo(RequestResult.Accepted));
+            Assert.That(agent.IsTransitioning, Is.True);
+
+            DriveToCompletion(agent);
+            Assert.That(agent.Current, Is.EqualTo(GuardId.IronGate));
         }
 
         /// <summary>The player's guard switching is deliberately unrestricted; only an opt-in profile

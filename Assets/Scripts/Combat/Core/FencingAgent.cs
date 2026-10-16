@@ -264,6 +264,44 @@ namespace Spellbreakers.Combat
         }
 
         /// <summary>
+        /// Brings a dead combatant back, optionally posed in <paramref name="guard"/>.
+        ///
+        /// This is deliberately its own entry point rather than a special case of <see cref="SetReaction"/>:
+        /// that method refuses to leave <see cref="ReactionState.Dead"/>, because "death never expires" is
+        /// the rule that makes a kill mean something. Coming back is a different decision, made by whoever
+        /// owns respawning.
+        /// </summary>
+        public void Revive(GuardId guard)
+        {
+            if (_reaction != ReactionState.Dead)
+                return;
+
+            var restored = guard != GuardId.None ? guard : (Current != GuardId.None ? Current : Previous);
+
+            IsTransitioning = false;
+            ActiveTransition = default;
+            Progress01 = 0f;
+            _elapsed = 0f;
+            _duration = 0f;
+            _feintRemaining = -1f;
+            _queuedGuard = GuardId.None;
+            _reaction = ReactionState.None;
+            _reactionRemaining = 0f;
+
+            Previous = restored;
+            Current = restored;
+            SecondsInGuard = 0f;
+
+            var guardProfile = _table.GuardOr(restored);
+            ParryWindowRemaining = guardProfile.ParryGraceSeconds;
+            TipReach = guardProfile.TipReach;
+
+            SetPhase(PassPhase.None);
+            ReactionChanged?.Invoke(ReactionState.None);
+            GuardChanged?.Invoke(Current);
+        }
+
+        /// <summary>
         /// Puts the combatant into a non-fencing state. <see cref="ReactionState.Dead"/> never expires.
         /// </summary>
         public void SetReaction(ReactionState state, float seconds = 0f)

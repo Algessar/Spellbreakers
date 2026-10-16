@@ -1345,6 +1345,12 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 4781de2af0999d94c94c8e5086d4a934, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3774051848236713509}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 4781de2af0999d94c94c8e5086d4a934, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -6640753482291081734}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 4781de2af0999d94c94c8e5086d4a934, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -3314299885170642288}
   m_SourcePrefab: {fileID: 100100000, guid: 4781de2af0999d94c94c8e5086d4a934, type: 3}
 --- !u!4 &729034917169228119 stripped
 Transform:
@@ -1576,3 +1582,39 @@ MonoBehaviour:
   _dampingSpeed: 12
   _combatHandler: {fileID: 8531167144695209458}
   _animator: {fileID: 0}
+--- !u!114 &-6640753482291081734
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8395194658243273007}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c89fb27c97664d519bf17e50abb45139, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Spellbreakers.Gameplay::Spellbreakers.Combat.RespawnOnDeath
+  _respawnDelay: 2.5
+  _respawnPoint: {fileID: 0}
+--- !u!114 &-3314299885170642288
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8395194658243273007}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f357d5da41cc367449a26b1f500651aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Spellbreakers.Gameplay::Spellbreakers.Combat.CombatVisualizer
+  _visible: 1
+  _showTargetMarker: 1
+  _showMeasureRings: 1
+  _showTargetingRange: 1
+  _showCombatantLabels: 1
+  _showCombatText: 1
+  _markerHeight: 2.15
+  _markerRadius: 0.1
+  _markerGroundRingRadius: 0.55
+  _ringWidth: 0.02

@@ -122,14 +122,23 @@ namespace Spellbreakers.Tests
             Assert.That(profile.EvaluateVisualProgress(1f), Is.EqualTo(1f));
         }
 
+        /// <summary>
+        /// Every transition presents through the single Langort pass state. The Passes layer carries no
+        /// per-direction apex states, so a profile naming one would scrub a state that does not exist.
+        /// </summary>
         [Test]
-        public void ResolveDefaultPassStateName_MapsAllDirectionsToDistinctStates()
+        public void DefaultTable_PresentsEveryTransitionThroughLangort()
         {
-            Assert.That(TransitionProfile.ResolveDefaultPassStateName(TransitionDirection.Oberhau), Is.EqualTo("Oberhau"));
-            Assert.That(TransitionProfile.ResolveDefaultPassStateName(TransitionDirection.Mittelhau), Is.EqualTo("Mittelhau"));
-            Assert.That(TransitionProfile.ResolveDefaultPassStateName(TransitionDirection.Unterhau), Is.EqualTo("Unterhau"));
-            Assert.That(TransitionProfile.ResolveDefaultPassStateName(TransitionDirection.Thrust), Is.EqualTo("Thrust"));
-            Assert.That(TransitionProfile.ResolveDefaultPassStateName(TransitionDirection.Neutral), Is.EqualTo("Langort"));
+            var table = TransitionTable.CreateDefault();
+
+            Assert.That(table.Count, Is.GreaterThan(0));
+
+            foreach (var profile in table.Profiles)
+            {
+                Assert.That(profile.PassStateName, Is.EqualTo("Langort"),
+                    $"{profile.DisplayName} should present through Langort");
+                Assert.That(profile.PassThrough, Is.EqualTo(GuardId.Langort));
+            }
         }
 
         [Test]

@@ -93,18 +93,6 @@ namespace Spellbreakers.Combat
         /// <summary>State name on the Animator's Passes layer that realises this transition.</summary>
         public string PassStateName { get; set; } = "Langort";
 
-        public static string ResolveDefaultPassStateName(TransitionDirection direction)
-        {
-            switch (direction)
-            {
-                case TransitionDirection.Oberhau: return "Oberhau";
-                case TransitionDirection.Mittelhau: return "Mittelhau";
-                case TransitionDirection.Unterhau: return "Unterhau";
-                case TransitionDirection.Thrust: return "Thrust";
-                default: return "Langort";
-            }
-        }
-
         /// <summary>
         /// Remaps normalized time (0..1) to non-linear biomechanical easing:
         /// slow preparatory chambering, explosive acceleration through the live damage window,

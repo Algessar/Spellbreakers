@@ -49,7 +49,7 @@ namespace Player
 
         private void LateUpdate()
         {
-            if (_chest == null || _combatHandler == null)
+            if (!_chest || !_combatHandler)
                 return;
 
             Quaternion targetOffset = Quaternion.identity;
