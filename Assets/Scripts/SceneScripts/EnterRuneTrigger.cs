@@ -14,7 +14,6 @@ public class EnterRuneTrigger : MonoBehaviour
     {
         if (other)
         {
-            Debug.Log($"OnTriggerEnter of Rune with ID :: {ID}");
             wasTriggered = true;
             _triggerAction?.Invoke();
         }

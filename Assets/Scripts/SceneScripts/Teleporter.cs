@@ -2,7 +2,6 @@ using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
-using UnityEngine.UIElements;
 
 public class Teleporter : MonoBehaviour 
 {
@@ -41,16 +40,24 @@ public class Teleporter : MonoBehaviour
     private void Start()
     {
         _timer = new();
+
+        if (_platformMesh == null)
+        {
+            Debug.LogError("Teleporter has no platform mesh assigned.", this);
+            enabled = false;
+            return;
+        }
+
         Renderer rend = _platformMesh.GetComponent<Renderer>();
         if (rend != null)
+        {
             _material = rend.material;   // this is the material instance
+            _material.EnableKeyword("_EMISSION");
+        }
         else
-            Debug.LogError("No Renderer found on " + _platformMesh.name);
-        
-        _material.EnableKeyword("_EMISSION");
-        
-        
-        // ActivateCompass();
+        {
+            Debug.LogError("No Renderer found on " + _platformMesh.name, this);
+        }
 
         //NOTE: The array will be populated manually!
 
@@ -91,9 +98,8 @@ public class Teleporter : MonoBehaviour
             }
         }
         Debug.Log($"Triggered ChangeScene from rune ID {_currentId}");
-        
+
         SceneManager.LoadScene(_currentId);
-        Debug.Log($"Why does LoadScene not trigger?");
     }
    
 
@@ -119,7 +125,7 @@ public class Teleporter : MonoBehaviour
     {
         
         // Increase intensity over time
-        if (!isGlowing) return;
+        if (!isGlowing || _material == null) return;
 
         currentIntensity += (maxIntensity / duration) * Time.deltaTime;
         currentIntensity = Mathf.Min(currentIntensity, maxIntensity); // clamp

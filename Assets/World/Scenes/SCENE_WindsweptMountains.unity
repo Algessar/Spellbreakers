@@ -1178,8 +1178,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ff7a1155fcd2c884ab6ad4fbadce22d1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CombatHandler
-  _animator: {fileID: 0}
-  _crossFade: 0.2
 --- !u!114 &1654363430
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1218,9 +1216,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7336534db6a666e44912ccbfbb576b14, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player.Movement_V3
-  _controller: {fileID: 9100000, guid: 756ed1e039128cd47ab2a6b7d74c092d, type: 2}
-  _vertical: 0
-  _horizontal: 0
   _moveAmount: 0
   _isMoving: 0
   _rotationSpeed: 5
@@ -1228,13 +1223,13 @@ MonoBehaviour:
   _walkThreshold: 0.1
   _runThreshold: 0.7
   _gravity: -15
-  _jumpHeight: 3
   _groundCheckDistance: 0.1
   _groundLayer:
     serializedVersion: 2
     m_Bits: 8
   _verticalVelocity: 0
   _isGrounded: 0
+  _logMovementDirection: 1
 --- !u!95 &1654363433
 Animator:
   serializedVersion: 7
