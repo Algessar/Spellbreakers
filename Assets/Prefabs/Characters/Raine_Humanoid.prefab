@@ -44,6 +44,7 @@ GameObject:
   - component: {fileID: 9081306276752320498}
   - component: {fileID: 1890317485254086692}
   - component: {fileID: 2602313049396431675}
+  - component: {fileID: -6989153822461573606}
   m_Layer: 6
   m_Name: weapon_collider
   m_TagString: Untagged
@@ -1341,6 +1342,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 4781de2af0999d94c94c8e5086d4a934, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7292472729885777338}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 4781de2af0999d94c94c8e5086d4a934, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3774051848236713509}
   m_SourcePrefab: {fileID: 100100000, guid: 4781de2af0999d94c94c8e5086d4a934, type: 3}
 --- !u!4 &729034917169228119 stripped
 Transform:
@@ -1537,3 +1541,38 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 4781de2af0999d94c94c8e5086d4a934, type: 3}
   m_PrefabInstance: {fileID: 8665155335043275902}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &-6989153822461573606
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7689061180214503600}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc3fd38d5dbb84b43b40a712a9857012, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Spellbreakers.Gameplay::Spellbreakers.Combat.BladeTrailEffect
+  _trailMaterial: {fileID: 2100000, guid: 89dc47249a644134d9aae3131ae40a33, type: 2}
+  _trailTime: 0.12
+  _trailWidth: 0.08
+  _combatHandler: {fileID: 8531167144695209458}
+  _blade: {fileID: 2602313049396431675}
+--- !u!114 &3774051848236713509
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8395194658243273007}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec37e015c97d8a24e9de442ea222c6ee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Spellbreakers.Gameplay::Player.ProceduralSwordMotion
+  _oberhauPitch: 12
+  _mittelhauYaw: 18
+  _unterhauPitch: 8
+  _dampingSpeed: 12
+  _combatHandler: {fileID: 8531167144695209458}
+  _animator: {fileID: 0}

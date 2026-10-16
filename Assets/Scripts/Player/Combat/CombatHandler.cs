@@ -206,18 +206,38 @@ public sealed class CombatHandler : MonoBehaviour
             return;
         }
 
-        // The guard layer holds the origin pose underneath; the pass layer does the visible work.
-        if (_renderedGuard != transition.From && HasGuardState(transition.From))
+        // Remap progress to non-linear biomechanical easing curve
+        var visualProgress = profile.EvaluateVisualProgress(Agent.Progress01);
+
+        // Three-point interpolation across the transition:
+        // First half (visualProgress < 0.5): blend from origin guard up to 100% pass apex.
+        // Second half (visualProgress >= 0.5): start transitioning guards layer to destination guard,
+        // and taper off the pass layer as we settle into the destination guard.
+        float passWeightTarget;
+        if (visualProgress < 0.5f)
         {
-            _animator.CrossFadeInFixedTime(GuardStateHash(transition.From), BlendDuration, _guardsLayer);
-            _renderedGuard = transition.From;
+            if (_renderedGuard != transition.From && HasGuardState(transition.From))
+            {
+                _animator.CrossFadeInFixedTime(GuardStateHash(transition.From), BlendDuration, _guardsLayer);
+                _renderedGuard = transition.From;
+            }
+            passWeightTarget = Mathf.Clamp01(visualProgress * 2f);
+        }
+        else
+        {
+            if (_renderedGuard != transition.To && HasGuardState(transition.To))
+            {
+                _animator.CrossFadeInFixedTime(GuardStateHash(transition.To), BlendDuration, _guardsLayer);
+                _renderedGuard = transition.To;
+            }
+            passWeightTarget = Mathf.Clamp01((1f - visualProgress) * 2f);
         }
 
         var passHash = PassStateHash(profile.PassStateName);
         if (passHash != 0)
-            _animator.Play(passHash, _passesLayer, Agent.Progress01);
+            _animator.Play(passHash, _passesLayer, visualProgress);
 
-        BlendPassWeight(1f);
+        BlendPassWeight(passWeightTarget);
     }
 
     private void BlendPassWeight(float target)

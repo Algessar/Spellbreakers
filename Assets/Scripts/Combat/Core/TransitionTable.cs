@@ -132,7 +132,7 @@ namespace Spellbreakers.Combat
             float damageEnd = 0.62f,
             float lunge = 0.75f,
             float maxDistance = 2.6f,
-            string passState = "Langort")
+            string passState = null)
         {
             return new TransitionProfile(from, to, direction, duration, damageStart, damageEnd)
             {
@@ -140,7 +140,7 @@ namespace Spellbreakers.Combat
                 LungeDistance = lunge,
                 MaxDistance = maxDistance,
                 MinDistance = 0f,
-                PassStateName = passState,
+                PassStateName = passState ?? TransitionProfile.ResolveDefaultPassStateName(direction),
             };
         }
 

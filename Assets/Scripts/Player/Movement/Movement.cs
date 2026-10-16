@@ -19,7 +19,7 @@ namespace Player
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(CapsuleCollider))]
-    public class Movement_V3 : MonoBehaviour
+    public class Movement : MonoBehaviour
     {
         [Header("Direction")]
         [SerializeField] private PlayerCamera _camera;

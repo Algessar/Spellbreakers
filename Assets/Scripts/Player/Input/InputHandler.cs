@@ -15,14 +15,14 @@ namespace Player
     public class InputHandler : MonoBehaviour
     {
         private Actions _actions;
-        private Movement_V3 _movement;
+        private Movement _movement;
         private PlayerCamera _camera;
         private CombatHandler _combat;
         private TargetingSystem _targeting;
 
         private void Awake()
         {
-            _movement = GetComponent<Movement_V3>();
+            _movement = GetComponent<Movement>();
             _camera = GetComponent<PlayerCamera>();
             _combat = GetComponent<CombatHandler>();
 
@@ -32,7 +32,7 @@ namespace Player
 
             _actions = new Actions();
 
-            WarnIfMissing(_movement, nameof(Movement_V3));
+            WarnIfMissing(_movement, nameof(Movement));
             WarnIfMissing(_camera, nameof(PlayerCamera));
             WarnIfMissing(_combat, nameof(CombatHandler));
         }

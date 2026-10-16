@@ -102,6 +102,37 @@ namespace Spellbreakers.Tests
         }
 
         [Test]
+        public void EvaluateVisualProgress_ProducesNonLinearBiomechanicalCurve()
+        {
+            var profile = Attack(damageStart: 0.30f, damageEnd: 0.60f);
+
+            // Chambering: early phase progress (0.15) should ease in slower than linear
+            float earlyLinear = 0.15f;
+            float earlyEvaluated = profile.EvaluateVisualProgress(earlyLinear);
+            Assert.That(earlyEvaluated, Is.LessThan(earlyLinear));
+
+            // Damage window: should be inside the live strike window
+            float midLinear = 0.45f;
+            float midEvaluated = profile.EvaluateVisualProgress(midLinear);
+            Assert.That(midEvaluated, Is.GreaterThanOrEqualTo(0.30f));
+            Assert.That(midEvaluated, Is.LessThanOrEqualTo(0.60f));
+
+            // End bounds: 0 and 1 clamp cleanly
+            Assert.That(profile.EvaluateVisualProgress(0f), Is.EqualTo(0f));
+            Assert.That(profile.EvaluateVisualProgress(1f), Is.EqualTo(1f));
+        }
+
+        [Test]
+        public void ResolveDefaultPassStateName_MapsAllDirectionsToDistinctStates()
+        {
+            Assert.That(TransitionProfile.ResolveDefaultPassStateName(TransitionDirection.Oberhau), Is.EqualTo("Oberhau"));
+            Assert.That(TransitionProfile.ResolveDefaultPassStateName(TransitionDirection.Mittelhau), Is.EqualTo("Mittelhau"));
+            Assert.That(TransitionProfile.ResolveDefaultPassStateName(TransitionDirection.Unterhau), Is.EqualTo("Unterhau"));
+            Assert.That(TransitionProfile.ResolveDefaultPassStateName(TransitionDirection.Thrust), Is.EqualTo("Thrust"));
+            Assert.That(TransitionProfile.ResolveDefaultPassStateName(TransitionDirection.Neutral), Is.EqualTo("Langort"));
+        }
+
+        [Test]
         public void HasDamageWindow_IsFalseWhenTheWindowIsEmptyOrInverted()
         {
             Assert.That(Attack(damageStart: 0.5f, damageEnd: 0.5f).HasDamageWindow, Is.False);

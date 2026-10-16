@@ -58,7 +58,7 @@ public static class CollisionTestSceneBuilder
         body.useGravity = false;
 
         // Movement_V3 auto-adds InputHandler, CapsuleCollider, PlayerCamera via [RequireComponent]
-        var movement = character.AddComponent<Player.Movement_V3>();
+        var movement = character.AddComponent<Player.Movement>();
         var capsule = character.GetComponent<CapsuleCollider>();
         if (capsule != null)
         {

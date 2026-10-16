@@ -93,6 +93,62 @@ namespace Spellbreakers.Combat
         /// <summary>State name on the Animator's Passes layer that realises this transition.</summary>
         public string PassStateName { get; set; } = "Langort";
 
+        public static string ResolveDefaultPassStateName(TransitionDirection direction)
+        {
+            switch (direction)
+            {
+                case TransitionDirection.Oberhau: return "Oberhau";
+                case TransitionDirection.Mittelhau: return "Mittelhau";
+                case TransitionDirection.Unterhau: return "Unterhau";
+                case TransitionDirection.Thrust: return "Thrust";
+                default: return "Langort";
+            }
+        }
+
+        /// <summary>
+        /// Remaps normalized time (0..1) to non-linear biomechanical easing:
+        /// slow preparatory chambering, explosive acceleration through the live damage window,
+        /// and smooth follow-through settling into the destination guard.
+        /// </summary>
+        public float EvaluateVisualProgress(float progress01)
+        {
+            var p = FencingMath.Clamp01(progress01);
+            if (!HasDamageWindow)
+            {
+                // Smoothstep for non-attack recoveries
+                return p * p * (3f - 2f * p);
+            }
+
+            var start = DamageWindowStart;
+            var end = DamageWindowEnd;
+
+            if (p < start)
+            {
+                if (start <= 0f)
+                    return 0f;
+                var t = p / start;
+                // Ease in: windup chambering
+                return start * (t * t);
+            }
+
+            if (p < end)
+            {
+                if (end <= start)
+                    return start;
+                var t = (p - start) / (end - start);
+                // Live strike: snappy, direct acceleration through the apex
+                return start + (end - start) * t;
+            }
+
+            var rem = 1f - end;
+            if (rem <= 0f)
+                return 1f;
+            var tRem = (p - end) / rem;
+            // Ease out: smooth deceleration settling into guard
+            var easeOut = 1f - (1f - tRem) * (1f - tRem);
+            return end + rem * easeOut;
+        }
+
         /// <summary>
         /// A recovery has no live blade. That is how the model expresses "leaving Langort back into a
         /// guard" without inventing a second kind of state.

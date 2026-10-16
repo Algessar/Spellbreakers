@@ -53,7 +53,7 @@ namespace Spellbreakers.Ai
         [SerializeField] private LayerMask _obstacleMask = ~0;
         [SerializeField, Min(0.1f)] private float _probeHeight = 0.9f;
 
-        private Movement_V3 _movement;
+        private Movement _movement;
         private NavMeshAgent _navMeshAgent;
         private NavMeshNavigator _navigator;
 
@@ -70,7 +70,7 @@ namespace Spellbreakers.Ai
 
         private void Awake()
         {
-            _movement = GetComponent<Movement_V3>() ?? transform.root.GetComponentInChildren<Movement_V3>(true);
+            _movement = GetComponent<Movement>() ?? transform.root.GetComponentInChildren<Movement>(true);
             _navMeshAgent = GetComponent<NavMeshAgent>() ?? transform.root.GetComponentInChildren<NavMeshAgent>(true);
             _navigator = new NavMeshNavigator(_navMeshAgent);
 
@@ -209,9 +209,9 @@ namespace Spellbreakers.Ai
         }
 
         /// <summary>
-        /// Movement without a camera treats the intent as world-space, so the enemy's steering vector maps
-        /// straight across. Magnitude is normalised against the run reference so the Animator still picks
-        /// walk or run the way it does for the player.
+        /// Converts the enemy's world-space steering vector into the character's local input space
+        /// (x = strafe right, y = forward). This ensures CharacterAnimatorDriver correctly picks forward,
+        /// backward, or strafe animations relative to where the character is facing.
         /// </summary>
         private LocomotionIntent ToIntent(Vector3 worldDirection, float speed)
         {
@@ -220,9 +220,15 @@ namespace Spellbreakers.Ai
                 return LocomotionIntent.Idle;
 
             var throttle = Mathf.Clamp01(speed / Mathf.Max(0.1f, _runSpeedReference));
-            var direction = flattened.normalized * throttle;
 
-            return new LocomotionIntent(new Vector2(direction.x, direction.z), throttle, true, true);
+            // Transform world direction into character local horizontal space:
+            // Vector3.forward in local space -> (0, 1) in Vector2 intent (forward)
+            // Vector3.back in local space -> (0, -1) in Vector2 intent (backward)
+            // Vector3.right in local space -> (1, 0) in Vector2 intent (strafe right)
+            // Vector3.left in local space -> (-1, 0) in Vector2 intent (strafe left)
+            var localDir = transform.InverseTransformDirection(flattened.normalized) * throttle;
+
+            return new LocomotionIntent(new Vector2(localDir.x, localDir.z), throttle, true, true);
         }
 
         private static Vector3 Flatten(Vector3 value)

@@ -24,7 +24,7 @@ namespace Player
         [SerializeField] private Camera _viewCamera;
 
         private readonly HashSet<Transform> _consideredTargets = new HashSet<Transform>();
-        private Movement_V3 _movement;
+        private Movement _movement;
         private Animator _animator;
         private Transform _playerRoot;
         private Transform _currentTarget;
@@ -73,9 +73,9 @@ namespace Player
             if (_animator == null)
                 _animator = GetComponentInChildren<Animator>(true);
 
-            _movement = GetComponentInParent<Movement_V3>();
+            _movement = GetComponentInParent<Movement>();
             if (_movement == null)
-                _movement = GetComponentInChildren<Movement_V3>(true);
+                _movement = GetComponentInChildren<Movement>(true);
 
             _playerRoot = _movement != null ? _movement.transform : transform.root;
 

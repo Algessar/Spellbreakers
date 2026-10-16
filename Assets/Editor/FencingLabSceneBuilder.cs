@@ -36,6 +36,7 @@ namespace Spellbreakers.EditorTools
         private static readonly Vector3 GroundPosition = Vector3.zero;
         private static readonly Vector3 PlayerSpawn = new Vector3(0f, 0f, -4f);
         private static readonly Vector3 EnemySpawn = new Vector3(0f, 0f, 4f);
+        private static readonly Vector3 EnemyEuler = new Vector3(0f, 180f, 0f);
         private static readonly Vector3 DummyPosition = new Vector3(-10f, 0f, 0f);
         private static readonly Vector3 DummyEuler = new Vector3(0f, 90f, 0f);
 
@@ -180,6 +181,8 @@ namespace Spellbreakers.EditorTools
                 notes.Add("enemy: MISSING - prefab could not be loaded");
                 return;
             }
+
+            enemy.transform.rotation = Quaternion.Euler(EnemyEuler);
 
             var enemyLayer = LayerMask.NameToLayer("Enemy");
             if (enemyLayer < 0)
