@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Spellbreakers.Combat;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -8,7 +9,6 @@ namespace Player
     [DisallowMultipleComponent]
     public sealed class TargetingSystem : MonoBehaviour
     {
-        [SerializeField] private LayerMask _enemyLayers = 1 << 8;
         [SerializeField, Min(1f)] private float _acquisitionRange = 25f;
         [SerializeField, Range(1f, 180f)] private float _acquisitionAngle = 100f;
         [SerializeField, Min(0.05f)] private float _targetRefreshInterval = 0.25f;
@@ -41,7 +41,13 @@ namespace Player
 
         public bool IsTargeting { get; private set; }
         public Transform CurrentTarget => _currentTarget;
-        public Transform TargetCurrent;
+
+        /// <summary>
+        /// The last target this system settled on, surviving a momentary loss of validity. Read-only:
+        /// it used to be a public field written from a tick, which read as an inter-component channel
+        /// but was really just leaked state.
+        /// </summary>
+        public Transform TargetCurrent { get; private set; }
 
         public static TargetingSystem GetOrAddForAnimator(Animator animator)
         {
@@ -86,6 +92,8 @@ namespace Player
                     _weaponAimBone = FindChildByName(_playerRoot, _weaponAimBoneName);
             }
 
+            // Always fetch this. Previously it was only resolved when _swordTip was also null, which
+            // happened to work but made the blade marker and the collider fallback depend on each other.
             _weaponDamage = _playerRoot != null ? _playerRoot.GetComponentInChildren<WeaponDamage>(true) : null;
 
             if (_viewCamera == null)
@@ -152,7 +160,11 @@ namespace Player
         private void OnDisable()
         {
             if (_combatHandler != null)
+            {
                 _combatHandler.PhaseChanged -= HandlePassPhaseChanged;
+                _combatHandler.SetOpponentDistance(float.PositiveInfinity);
+            }
+
             IsTargeting = false;
             _guardPassAimActive = false;
             ClearTarget();
@@ -196,39 +208,38 @@ namespace Player
             _consideredTargets.Clear();
 
             var center = _playerRoot.position + Vector3.up * 1.2f;
-            var colliders = Physics.OverlapSphere(
-                center,
-                _acquisitionRange,
-                _enemyLayers,
-                QueryTriggerInteraction.Ignore);
 
             Transform bestTarget = null;
             Damageable bestDamageable = null;
             var bestScore = float.PositiveInfinity;
 
-            foreach (var targetCollider in colliders)
+            // Registry-driven rather than scene-searched: this used to run
+            // FindObjectsByType<Damageable>() plus a GetComponentsInChildren<Collider> per candidate
+            // every quarter second, which scaled badly with level size. Props such as a training dummy
+            // are included without needing to sit on the Enemy layer.
+            foreach (var damageable in Damageable.All)
             {
-                var damageable = targetCollider.GetComponentInParent<Damageable>();
-                var target = damageable != null
-                    ? damageable.transform
-                    : targetCollider.attachedRigidbody != null
-                        ? targetCollider.attachedRigidbody.transform
-                        : targetCollider.transform.root;
+                if (damageable == null || !damageable.IsAlive)
+                    continue;
 
-                ConsiderTarget(target, damageable, center, ref bestTarget, ref bestDamageable, ref bestScore);
-            }
-
-            // Damageable props such as the training dummy can be targetable without using the Enemy layer.
-            var damageableTargets = FindObjectsByType<Damageable>(FindObjectsInactive.Exclude);
-            foreach (var damageable in damageableTargets)
-            {
-                if (damageable && !damageable.IsDead)
-                    ConsiderTarget(damageable.transform, damageable, center, ref bestTarget, ref bestDamageable, ref bestScore);
+                ConsiderTarget(
+                    damageable.transform,
+                    damageable,
+                    center,
+                    ref bestTarget,
+                    ref bestDamageable,
+                    ref bestScore);
             }
 
             _currentTarget = bestTarget;
             _currentDamageable = bestDamageable;
             _movement?.SetTargeting(IsTargeting, _currentTarget);
+
+            if (_combatHandler != null)
+            {
+                _combatHandler.SetOpponentDistance(
+                    _currentTarget ? Vector3.Distance(_playerRoot.position, _currentTarget.position) : float.PositiveInfinity);
+            }
         }
 
         private void ConsiderTarget(
@@ -245,7 +256,7 @@ namespace Player
                 return;
             }
 
-            var aimPoint = GetAimPoint(target);
+            var aimPoint = damageable != null ? damageable.AimPosition : GetAimPoint(target);
             var offset = aimPoint - origin;
             var distance = offset.magnitude;
             if (distance <= 0.01f || distance > _acquisitionRange)

@@ -1,60 +1,74 @@
 using UnityEngine;
 
-
 namespace Player
 {
     /// <summary>
-    /// Player Input class. Only used to register input actions.
+    /// Routes the player's input asset into the character's systems. It holds no gameplay rules of its
+    /// own: every combat input becomes a guard request on <see cref="CombatHandler"/>, which is the same
+    /// entry point an enemy brain uses.
+    ///
+    /// Subscriptions are set up in OnEnable and torn down in OnDisable, and the action asset is disposed
+    /// on destroy. The previous version subscribed only in OnEnable but assumed Start had already run,
+    /// never disposed the asset, and would silently stay dead after a disable/enable cycle.
     /// </summary>
-    
     [DisallowMultipleComponent]
     public class InputHandler : MonoBehaviour
     {
         private Actions _actions;
-        private Movement_V3 _move3;
+        private Movement_V3 _movement;
         private PlayerCamera _camera;
-
         private CombatHandler _combat;
         private TargetingSystem _targeting;
 
-        private void OnEnable()
+        private void Awake()
         {
-            _actions = new Actions();
-            _actions.Player.Enable();
-            _move3 = GetComponent<Movement_V3>();
-
+            _movement = GetComponent<Movement_V3>();
             _camera = GetComponent<PlayerCamera>();
-
             _combat = GetComponent<CombatHandler>();
 
-            // Animator IK callbacks run on the Animator's GameObject.
+            // Animator IK callbacks run on the Animator's GameObject, so targeting resolves from there.
             var animator = GetComponentInChildren<Animator>(true);
             _targeting = TargetingSystem.GetOrAddForAnimator(animator);
-            
-            if (_move3 != null)
+
+            _actions = new Actions();
+
+            WarnIfMissing(_movement, nameof(Movement_V3));
+            WarnIfMissing(_camera, nameof(PlayerCamera));
+            WarnIfMissing(_combat, nameof(CombatHandler));
+        }
+
+        private void OnEnable()
+        {
+            if (_actions == null)
+                return;
+
+            _actions.Player.Enable();
+
+            var player = _actions.Player;
+
+            if (_movement != null)
             {
-                _actions.Player.Move.performed += _move3.OnMove;
-                _actions.Player.Move.canceled += _move3.OnMove;
+                player.Move.performed += _movement.OnMove;
+                player.Move.canceled += _movement.OnMove;
             }
-  
+
             if (_camera != null)
             {
-                _actions.Player.Look.performed += _camera.OnLook;
-                _actions.Player.Look.canceled += _camera.OnLook;
+                player.Look.performed += _camera.OnLook;
+                player.Look.canceled += _camera.OnLook;
             }
-            
-            //Combat stuff
 
             if (_combat != null)
             {
-                _actions.Player.VomTag.started += _combat.OnVomTag;
-                _actions.Player.Pflug.started += _combat.OnPflug;
-                _actions.Player.Alber.started += _combat.OnAlber;
-                _actions.Player.Ochs.started += _combat.OnOchs;
-                _actions.Player.IronGate.started += _combat.OnIronGate;
+                player.VomTag.started += _combat.OnVomTag;
+                player.Pflug.started += _combat.OnPflug;
+                player.Alber.started += _combat.OnAlber;
+                player.Ochs.started += _combat.OnOchs;
+                player.IronGate.started += _combat.OnIronGate;
             }
+
             if (_targeting != null)
-                _actions.Player.SwitchTarget.started += _targeting.ToggleTargeting;
+                player.SwitchTarget.started += _targeting.ToggleTargeting;
         }
 
         private void OnDisable()
@@ -62,33 +76,53 @@ namespace Player
             if (_actions == null)
                 return;
 
-            if (_move3 != null)
+            var player = _actions.Player;
+
+            if (_movement != null)
             {
-                _actions.Player.Move.performed -= _move3.OnMove;
-                _actions.Player.Move.canceled -= _move3.OnMove;
+                player.Move.performed -= _movement.OnMove;
+                player.Move.canceled -= _movement.OnMove;
             }
+
             if (_camera != null)
             {
-                _actions.Player.Look.performed -= _camera.OnLook;
-                _actions.Player.Look.canceled -= _camera.OnLook;
+                player.Look.performed -= _camera.OnLook;
+                player.Look.canceled -= _camera.OnLook;
             }
-            
+
             if (_combat != null)
             {
-                _actions.Player.VomTag.started -= _combat.OnVomTag;
-                _actions.Player.Pflug.started -= _combat.OnPflug;
-                _actions.Player.Alber.started -= _combat.OnAlber;
-                _actions.Player.Ochs.started -= _combat.OnOchs;
-                _actions.Player.IronGate.started -= _combat.OnIronGate;
+                player.VomTag.started -= _combat.OnVomTag;
+                player.Pflug.started -= _combat.OnPflug;
+                player.Alber.started -= _combat.OnAlber;
+                player.Ochs.started -= _combat.OnOchs;
+                player.IronGate.started -= _combat.OnIronGate;
             }
-            if (_targeting != null)
-                _actions.Player.SwitchTarget.started -= _targeting.ToggleTargeting;
-            _targeting?.StopTargeting();
 
+            if (_targeting != null)
+            {
+                player.SwitchTarget.started -= _targeting.ToggleTargeting;
+                _targeting.StopTargeting();
+            }
+
+            player.Disable();
+        }
+
+        private void OnDestroy()
+        {
+            if (_actions == null)
+                return;
 
             _actions.Disable();
             _actions.Dispose();
             _actions = null;
+        }
+
+        /// <summary>Misconfigured prefabs should fail loudly and early rather than with a null reference.</summary>
+        private void WarnIfMissing(Object component, string typeName)
+        {
+            if (component == null)
+                Debug.LogWarning($"{name}: InputHandler found no {typeName} on this object.", this);
         }
     }
 }

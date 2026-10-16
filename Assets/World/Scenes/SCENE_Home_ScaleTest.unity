@@ -364,6 +364,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Raine_Humanoid
       objectReference: {fileID: 0}
+    - target: {fileID: 8531167144695209458, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
+      propertyPath: _initialGuard
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 9081306276752320498, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
       propertyPath: m_Size.y
       value: 1.1358976
@@ -398,7 +402,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9208288538966670229, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -8.39
+      value: -4.45
       objectReference: {fileID: 0}
     - target: {fileID: 9208288538966670229, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
       propertyPath: m_LocalPosition.y
@@ -406,7 +410,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9208288538966670229, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 20.35
+      value: 11.08
       objectReference: {fileID: 0}
     - target: {fileID: 9208288538966670229, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
       propertyPath: m_LocalRotation.w
@@ -538,7 +542,7 @@ Transform:
   m_GameObject: {fileID: 1310861497}
   serializedVersion: 2
   m_LocalRotation: {x: 0.00054018287, y: 0.99600023, z: -0.08914517, w: 0.0060353493}
-  m_LocalPosition: {x: -8.438475, y: 13.58, z: 24.349707}
+  m_LocalPosition: {x: -4.4984746, y: 13.58, z: 15.079706}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
