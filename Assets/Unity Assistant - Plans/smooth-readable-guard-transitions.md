@@ -1,3 +1,5 @@
+[obsolete] [created by Unity Assistant]
+
 # Project Overview
 - **Game Title**: Spellbreakers
 - **High-Level Concept**: A grounded Historical European Martial Arts (HEMA / Liechtenauer)-inspired tactical swordplay game where transitions between guards are the attacks themselves—there are no detached "attack animations".
