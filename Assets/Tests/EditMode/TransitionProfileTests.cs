@@ -53,14 +53,75 @@ namespace Spellbreakers.Tests
         }
 
         /// <summary>
-        /// A transition is defined as movement *between* two guards, so a pair that names the same guard
-        /// twice is not an attack and must never reach the table.
+        /// Design doc 3.2: a transition may begin and end in the same guard - "Vom Tag -> Vom Tag =
+        /// Zornhau". The system must not assume the destination always differs from the source, so a
+        /// same-guard pair is a legal self-transition rather than a constructor error.
         /// </summary>
         [Test]
-        public void Constructor_RejectsATransitionFromAGuardToItself()
+        public void Constructor_AllowsATransitionFromAGuardToItself()
         {
-            Assert.Throws<ArgumentException>(() =>
-                new TransitionProfile(GuardId.Ochs, GuardId.Ochs, TransitionDirection.Thrust, 0.4f, 0.3f, 0.6f));
+            var zornhau = Attack(GuardId.VomTag, GuardId.VomTag);
+
+            Assert.That(zornhau.From, Is.EqualTo(GuardId.VomTag));
+            Assert.That(zornhau.To, Is.EqualTo(GuardId.VomTag));
+            Assert.That(zornhau.IsSelfTransition, Is.True);
+            Assert.That(zornhau.HasDamageWindow, Is.True, "a self-transition is still an attack");
+        }
+
+        /// <summary>A self-transition with no damage window is inert but still legal to author.</summary>
+        [Test]
+        public void SelfTransition_WithoutADamageWindowIsLegalButNotAnAttack()
+        {
+            var reset = Attack(GuardId.Ochs, GuardId.Ochs, 0f, 0f);
+
+            Assert.That(reset.IsSelfTransition, Is.True);
+            Assert.That(reset.HasDamageWindow, Is.False);
+            Assert.That(reset.IsInDamageWindow(0.5f), Is.False);
+        }
+
+        [Test]
+        public void Sides_DefaultToRightSoExistingAuthoringStaysValid()
+        {
+            var profile = Attack();
+
+            Assert.That(profile.FromSide, Is.EqualTo(GuardSide.Right));
+            Assert.That(profile.ToSide, Is.EqualTo(GuardSide.Right));
+            Assert.That(profile.FromKey.Side, Is.EqualTo(GuardSide.Right));
+            Assert.That(profile.IsSideSwitch, Is.False);
+        }
+
+        /// <summary>Doc 3.2's alternative to a same-side self-transition: R Vom Tag -> L Vom Tag.</summary>
+        [Test]
+        public void SelfTransition_ThatChangesSideIsASideSwitch()
+        {
+            var switchSides = Attack(GuardId.VomTag, GuardId.VomTag);
+            switchSides.FromSide = GuardSide.Right;
+            switchSides.ToSide = GuardSide.Left;
+
+            Assert.That(switchSides.IsSelfTransition, Is.True);
+            Assert.That(switchSides.IsSideSwitch, Is.True);
+            Assert.That(switchSides.FromKey, Is.EqualTo(GuardKey.Right(GuardId.VomTag)));
+            Assert.That(switchSides.ToKey, Is.EqualTo(GuardKey.Left(GuardId.VomTag)));
+            Assert.That(switchSides.DisplayName, Does.Contain("side switch"));
+        }
+
+        /// <summary>
+        /// The technique name is authoring and debug display only. It must not change any mechanical
+        /// value, so the doc's Zornhau/Oberhau distinction never becomes a gameplay one.
+        /// </summary>
+        [Test]
+        public void TechniqueName_IsDisplayOnlyAndDoesNotAffectMechanics()
+        {
+            var unnamed = Attack();
+            var named = Attack();
+            named.TechniqueName = "Zornhau";
+
+            Assert.That(named.DisplayName, Does.Contain("Zornhau"));
+            Assert.That(named.Direction, Is.EqualTo(unnamed.Direction));
+            Assert.That(named.Duration, Is.EqualTo(unnamed.Duration));
+            Assert.That(named.DamageWindowStart, Is.EqualTo(unnamed.DamageWindowStart));
+            Assert.That(named.DamageWindowEnd, Is.EqualTo(unnamed.DamageWindowEnd));
+            Assert.That(named.HasDamageWindow, Is.EqualTo(unnamed.HasDamageWindow));
         }
 
         [Test]
@@ -96,7 +157,7 @@ namespace Spellbreakers.Tests
             Assert.That(profile.ParryWindowStart, Is.EqualTo(0.05f).Within(Tolerance));
             Assert.That(profile.ParryWindowEnd, Is.EqualTo(0.95f).Within(Tolerance));
             Assert.That(profile.Commitment, Is.EqualTo(0.35f).Within(Tolerance));
-            Assert.That(profile.PassThrough, Is.EqualTo(GuardId.Langort));
+            Assert.That(profile.TransitionPose, Is.EqualTo(GuardId.Langort));
             Assert.That(profile.PassStateName, Is.EqualTo("Langort"));
             Assert.That(TransitionProfile.VorDurationScale, Is.EqualTo(0.85f).Within(Tolerance));
         }
@@ -123,22 +184,44 @@ namespace Spellbreakers.Tests
         }
 
         /// <summary>
-        /// Every transition presents through the single Langort pass state. The Passes layer carries no
-        /// per-direction apex states, so a profile naming one would scrub a state that does not exist.
+        /// Every attack reaches through a named pose - the doc's TransitionPose, formerly "pass-through" -
+        /// so presentation always has a state to scrub. In Krieg the pose may tighten to a different guard;
+        /// a row that does not author that tighter pose must fall back to the same pose, never to nothing.
         /// </summary>
         [Test]
-        public void DefaultTable_PresentsEveryTransitionThroughLangort()
+        public void DefaultTable_NamesThePoseEveryTransitionReachesThrough()
         {
             var table = TransitionTable.CreateDefault();
+            var kriegSpecificPoses = 0;
 
             Assert.That(table.Count, Is.GreaterThan(0));
 
             foreach (var profile in table.Profiles)
             {
-                Assert.That(profile.PassStateName, Is.EqualTo("Langort"),
-                    $"{profile.DisplayName} should present through Langort");
-                Assert.That(profile.PassThrough, Is.EqualTo(GuardId.Langort));
+                Assert.That(profile.TransitionPose, Is.Not.EqualTo(GuardId.None),
+                    $"{profile.DisplayName} must name the pose it reaches through");
+
+                if (profile.TransitionPoseInKrieg != GuardId.None)
+                {
+                    kriegSpecificPoses++;
+                    Assert.That(profile.ResolveTransitionPose(Measure.Krieg),
+                        Is.EqualTo(profile.TransitionPoseInKrieg),
+                        $"{profile.DisplayName} authors a tighter Krieg pose");
+                }
+                else
+                {
+                    Assert.That(profile.ResolveTransitionPose(Measure.Krieg),
+                        Is.EqualTo(profile.TransitionPose),
+                        $"{profile.DisplayName} must fall back to its normal pose in Krieg");
+                }
+
+                Assert.That(profile.ResolveTransitionPose(Measure.Zufechten),
+                    Is.EqualTo(profile.TransitionPose),
+                    $"{profile.DisplayName} reaches through its normal pose outside Krieg");
             }
+
+            Assert.That(kriegSpecificPoses, Is.GreaterThan(0),
+                "the default table must demonstrate a Krieg-specific pose");
         }
 
         [Test]
@@ -150,18 +233,19 @@ namespace Spellbreakers.Tests
         }
 
         /// <summary>
-        /// A recovery carries no live blade at all. Without this, a no-damage profile would still appear
-        /// to strike at every progress value, and parry resolution would arm itself on a dead blade.
+        /// A transition with no damage window - a synthesised traversal, say - carries no live blade at
+        /// all. Without this, a no-damage profile would still appear to strike at every progress value,
+        /// and parry resolution would arm itself on a dead blade.
         /// </summary>
         [Test]
         public void IsInDamageWindow_IsFalseEverywhereWhenThereIsNoDamageWindow()
         {
-            var recovery = Attack(damageStart: 0.5f, damageEnd: 0.5f);
+            var traversal = Attack(damageStart: 0.5f, damageEnd: 0.5f);
 
             for (var step = 0; step <= 20; step++)
             {
                 var progress = step / 20f;
-                Assert.That(recovery.IsInDamageWindow(progress), Is.False, $"progress {progress}");
+                Assert.That(traversal.IsInDamageWindow(progress), Is.False, $"progress {progress}");
             }
         }
 

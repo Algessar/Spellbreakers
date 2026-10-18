@@ -1,4 +1,4 @@
-ai-ignore
+[ai-ignore]
 
 # 7. Zornhau vs Oberhau
 

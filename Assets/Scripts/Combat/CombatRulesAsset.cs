@@ -56,6 +56,15 @@ namespace Spellbreakers.Combat
             public float ParryWindowEnd;
             public float Commitment;
             public float LungeDistance;
+
+            [Tooltip("The extreme pose the attack reaches through. Langort is the general case at Zufechten.")]
+            public GuardId TransitionPose;
+
+            [Tooltip("Transition pose used in Krieg instead. None means 'same as TransitionPose'.")]
+            public GuardId TransitionPoseInKrieg;
+
+            [Tooltip("Display-only technique name, e.g. Zornhau or Stichen. Carries no mechanics.")]
+            public string TechniqueName;
         }
 
         [Serializable]
@@ -149,6 +158,12 @@ namespace Spellbreakers.Combat
 
                 if (!string.IsNullOrEmpty(entry.PassStateName))
                     profile.PassStateName = entry.PassStateName;
+
+                if (entry.TransitionPose != GuardId.None)
+                    profile.TransitionPose = entry.TransitionPose;
+
+                profile.TransitionPoseInKrieg = entry.TransitionPoseInKrieg;
+                profile.TechniqueName = entry.TechniqueName;
 
                 if (!table.Add(profile))
                 {

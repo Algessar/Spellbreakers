@@ -62,9 +62,12 @@ rather than on the attacker's anatomy. A successful interaction may therefore ex
 
 **good timing / angle → clean deflection → partial deflection → knockback / stagger → failed defence / hit**
 
+
 Mass, momentum, attack speed, contact angle and weapon/body geometry can influence the result. A sword might cleanly 
 redirect a human sword strike, partially deflect a troll's club, or be overwhelmed by a massive dragon attack.
 
+[Not sure if this is worded correctly. Optimally, there should not be a separate system for enemies. The Core Combat system
+is designed in a way that is generalizable for martial arts, just like it is irl. Maybe it is correcly worded?]
 The player's **guard-transition system remains specialized to the player's longsword combat**, while the underlying attack, 
 contact, damage and deflection systems should ideally be general enough to support very different enemy anatomies and attack styles.
 

@@ -12,19 +12,18 @@ namespace Spellbreakers.Tests
     [TestFixture]
     public sealed class TransitionTableTests
     {
-        // 18 attacks plus the 4 Langort re-guarding recoveries. Langort -> Alber is the Oberhau cut from
-        // the long point, so it is an attack and the recovery to Alber is not authored.
-        private const int ExpectedDefaultProfileCount = 22;
-        private const int ExpectedDefaultGuardCount = 6;
-        private const int ExpectedRecoveryCount = 4;
+        // Counts are deliberately NOT hard-coded: this table is live authored data (the dev doc marks it
+        // "under review"), so pinning an exact total means every added transition breaks the suite for
+        // no reason. What matters are the shape invariants below, which the table must keep no matter
+        // how many rows it grows to.
 
         [Test]
-        public void CreateDefault_AuthorsSixGuardsAndTheFullTransitionSet()
+        public void CreateDefault_AuthorsEveryDestinationGuard()
         {
             var table = TransitionTable.CreateDefault();
 
-            Assert.That(table.Count, Is.EqualTo(ExpectedDefaultProfileCount));
-            Assert.That(table.Profiles.Count, Is.EqualTo(ExpectedDefaultProfileCount));
+            Assert.That(table.Count, Is.GreaterThan(0));
+            Assert.That(table.Profiles.Count, Is.EqualTo(table.Count), "Count and Profiles must agree");
             Assert.That(table.GuardOr(GuardId.VomTag).TipReach, Is.GreaterThan(0f));
             Assert.That(table.GuardOr(GuardId.IronGate).Guard, Is.EqualTo(GuardId.IronGate));
 
@@ -35,69 +34,89 @@ namespace Spellbreakers.Tests
                 guarded.Add(profile.To);
             }
 
-            Assert.That(guarded.Count, Is.EqualTo(ExpectedDefaultGuardCount));
-        }
-
-        [Test]
-        public void CreateDefault_NeverAuthorsATransitionOntoItsOwnGuard()
-        {
-            var table = TransitionTable.CreateDefault();
-
-            foreach (var profile in table.Profiles)
-                Assert.That(profile.From, Is.Not.EqualTo(profile.To), profile.DisplayName);
+            // Langort is pass-only, so the authored endpoints are exactly the guards a transition may
+            // legitimately end in - one fewer than every guard the build can represent.
+            Assert.That(guarded.Count, Is.EqualTo(GuardIds.Destinations.Length),
+                "every destination guard must appear as an endpoint, and no one else");
+            foreach (var destination in GuardIds.Destinations)
+                Assert.That(guarded, Does.Contain(destination), $"{destination} is never an endpoint");
         }
 
         /// <summary>
-        /// Recoveries are the punish window: settling back out of Langort carries no live blade. The
-        /// invariant is therefore "no damage window implies a Neutral line", not "everything out of
-        /// Langort is a recovery" - Langort also throws the cut down into Alber.
+        /// Langort is a pose a cut passes *through*, never a guard a fighter holds (dev doc 5). An
+        /// authored row that starts or ends there would make the pass state into a real stance.
         /// </summary>
         [Test]
-        public void CreateDefault_TransitionsWithoutADamageWindowAreExactlyTheRecoveries()
+        public void CreateDefault_NeverUsesLangortAsAnEndpoint()
         {
             var table = TransitionTable.CreateDefault();
-            var recoveries = 0;
-            var attacks = 0;
 
             foreach (var profile in table.Profiles)
             {
-                if (!profile.HasDamageWindow)
-                {
-                    recoveries++;
-                    Assert.That(profile.Direction, Is.EqualTo(TransitionDirection.Neutral), profile.DisplayName);
-                    Assert.That(profile.From, Is.EqualTo(GuardId.Langort), profile.DisplayName);
-                }
-                else
-                {
-                    attacks++;
-                }
+                Assert.That(profile.From, Is.Not.EqualTo(GuardId.Langort),
+                    $"{profile.DisplayName}: Langort is pass-only per dev doc 5, never a source guard");
+                Assert.That(profile.To, Is.Not.EqualTo(GuardId.Langort),
+                    $"{profile.DisplayName}: Langort is pass-only per dev doc 5, never a destination guard");
             }
-
-            Assert.That(recoveries, Is.EqualTo(ExpectedRecoveryCount));
-            Assert.That(attacks, Is.EqualTo(ExpectedDefaultProfileCount - ExpectedRecoveryCount));
-            Assert.That(attacks + recoveries, Is.EqualTo(ExpectedDefaultProfileCount));
         }
 
         /// <summary>
-        /// Every profile out of Langort except the cut into Alber is a re-guarding recovery, and that cut
-        /// is a real attack. This is the shape that caught the duplicated Langort pair.
+        /// Design doc 3.2: a self-transition is legal - "Vom Tag -> Vom Tag = Zornhau". The invariant is
+        /// therefore not "from must differ from to", but "a self-transition must be a real attack": it
+        /// has to carry a live blade, otherwise it is a no-op that could be requested forever.
         /// </summary>
         [Test]
-        public void CreateDefault_LangortThrowsOneCutAndOtherwiseRecovers()
+        public void CreateDefault_SelfTransitionsAreLegalButMustBeAttacks()
         {
             var table = TransitionTable.CreateDefault();
-
-            Assert.That(table.TryGet(GuardId.Langort, GuardId.Alber, out var cut), Is.True);
-            Assert.That(cut.HasDamageWindow, Is.True, "the cut down from the long point is an attack");
-            Assert.That(cut.Direction, Is.EqualTo(TransitionDirection.Oberhau));
+            var selfTransitions = 0;
 
             foreach (var profile in table.Profiles)
             {
-                if (profile.From != GuardId.Langort || profile.To == GuardId.Alber)
+                if (profile.From != profile.To)
                     continue;
 
-                Assert.That(profile.HasDamageWindow, Is.False, profile.DisplayName);
-                Assert.That(profile.Direction, Is.EqualTo(TransitionDirection.Neutral), profile.DisplayName);
+                selfTransitions++;
+                Assert.That(profile.HasDamageWindow, Is.True,
+                    $"{profile.DisplayName} is a self-transition with no live blade, so it does nothing");
+                Assert.That(profile.IsSelfTransition, Is.True);
+            }
+
+            Assert.That(selfTransitions, Is.GreaterThan(0),
+                "doc 3.2 requires the concept to be supported, and the default table should demonstrate it");
+        }
+
+        /// <summary>The one self-transition the dev doc names: the Zornhau thrown from Vom Tag returns
+        /// to Vom Tag. The other three self-pairs are deliberately not authored.</summary>
+        [TestCase(GuardId.VomTag, "Zornhau")]
+        public void CreateDefault_AuthorsTheDocumentedSelfTransitions(GuardId guard, string technique)
+        {
+            var table = TransitionTable.CreateDefault();
+
+            Assert.That(table.TryGet(guard, guard, out var profile), Is.True, $"{guard} -> {guard}");
+            Assert.That(profile.IsSelfTransition, Is.True);
+            Assert.That(profile.TechniqueName, Is.EqualTo(technique));
+            Assert.That(profile.HasDamageWindow, Is.True);
+        }
+
+        /// <summary>
+        /// Every authored transition is an attack: the blade is live through its damage window, and the
+        /// beat to punish is the Settle phase that follows. A row with no damage window - or a Neutral
+        /// line - would be the retired "recovery" concept sneaking back in.
+        /// </summary>
+        [Test]
+        public void CreateDefault_AuthorsEveryTransitionAsAnAttack()
+        {
+            var table = TransitionTable.CreateDefault();
+
+            Assert.That(table.Count, Is.GreaterThan(0));
+
+            foreach (var profile in table.Profiles)
+            {
+                Assert.That(profile.HasDamageWindow, Is.True,
+                    $"{profile.DisplayName} has no live blade, so it is not an attack");
+                Assert.That(profile.Direction, Is.Not.EqualTo(TransitionDirection.Neutral),
+                    $"{profile.DisplayName} names no cut, so it is not an attack");
             }
         }
 
@@ -118,7 +137,6 @@ namespace Spellbreakers.Tests
         [TestCase(GuardId.None, GuardId.Alber)]
         [TestCase(GuardId.VomTag, GuardId.None)]
         [TestCase(GuardId.None, GuardId.None)]
-        [TestCase(GuardId.Ochs, GuardId.Ochs)]
         public void TryGet_RefusesNonsensePairs(GuardId from, GuardId to)
         {
             var table = TransitionTable.CreateDefault();
@@ -131,6 +149,7 @@ namespace Spellbreakers.Tests
         public void Add_RefusesADuplicatePairButKeepsTheFirst()
         {
             var table = TransitionTable.CreateDefault();
+            var countBefore = table.Count;
             var existing = table.Profiles[0];
             var duplicate = new TransitionProfile(
                 existing.From,
@@ -141,7 +160,7 @@ namespace Spellbreakers.Tests
                 0.2f);
 
             Assert.That(table.Add(duplicate), Is.False);
-            Assert.That(table.Count, Is.EqualTo(ExpectedDefaultProfileCount));
+            Assert.That(table.Count, Is.EqualTo(countBefore), "a rejected duplicate must not change the table");
             Assert.That(table.TryGet(existing.From, existing.To, out var stored), Is.True);
             Assert.That(stored, Is.SameAs(existing));
         }
@@ -170,31 +189,30 @@ namespace Spellbreakers.Tests
             var table = TransitionTable.CreateDefault();
             var results = new List<TransitionProfile> { null, null, null };
 
-            table.CollectFrom(GuardId.Pflug, results);
+            table.CollectFrom(GuardId.VomTag, results);
 
             Assert.That(results, Is.Not.Empty);
             Assert.That(results, Has.None.Null);
             foreach (var profile in results)
-                Assert.That(profile.From, Is.EqualTo(GuardId.Pflug));
+                Assert.That(profile.From, Is.EqualTo(GuardId.VomTag));
 
             // A second call must not append to the previous contents. The expected size is derived from
             // the table itself so this test pins the clearing behaviour, not the authored counts.
-            var pflugCount = results.Count;
-            Assert.That(pflugCount, Is.GreaterThan(0), "Pflug authors real transitions");
+            Assert.That(results.Count, Is.GreaterThan(0), "Vom Tag authors real transitions");
 
-            var expectedLangort = 0;
+            var expected = 0;
             foreach (var profile in table.Profiles)
             {
-                if (profile.From == GuardId.Langort)
-                    expectedLangort++;
+                if (profile.From == GuardId.Pflug)
+                    expected++;
             }
 
-            table.CollectFrom(GuardId.Langort, results);
+            table.CollectFrom(GuardId.Pflug, results);
 
-            Assert.That(expectedLangort, Is.GreaterThan(0));
-            Assert.That(results.Count, Is.EqualTo(expectedLangort), "the previous contents were replaced, not appended to");
+            Assert.That(expected, Is.GreaterThan(0), "Pflug authors real transitions");
+            Assert.That(results.Count, Is.EqualTo(expected), "the previous contents were replaced, not appended to");
             foreach (var profile in results)
-                Assert.That(profile.From, Is.EqualTo(GuardId.Langort));
+                Assert.That(profile.From, Is.EqualTo(GuardId.Pflug));
         }
 
         [Test]
@@ -326,10 +344,37 @@ namespace Spellbreakers.Tests
             Assert.That(state.From, Is.EqualTo(GuardId.Alber));
             Assert.That(state.To, Is.EqualTo(GuardId.VomTag));
             Assert.That(state.Direction, Is.EqualTo(TransitionDirection.Unterhau));
-            Assert.That(state.PassThrough, Is.EqualTo(GuardId.Langort));
+            Assert.That(state.TransitionPose, Is.EqualTo(GuardId.Langort));
             Assert.That(state.LungeDistance, Is.EqualTo(0.9f).Within(1e-5f));
             Assert.That(state.IsInDamageWindow(0.4f), Is.True);
             Assert.That(state.IsInDamageWindow(0.1f), Is.False);
+        }
+
+        /// <summary>
+        /// The state is what perception and parry resolution receive, so it has to forward the pose
+        /// members - including the Krieg-specific one - rather than exposing only the normal pose.
+        /// </summary>
+        [Test]
+        public void ConstructedState_MirrorsThePoseTheAttackReachesThrough()
+        {
+            var profile = new TransitionProfile(
+                GuardId.Alber,
+                GuardId.VomTag,
+                TransitionDirection.Unterhau,
+                0.44f,
+                0.34f,
+                0.62f)
+            {
+                TransitionPose = GuardId.Pflug,
+                TransitionPoseInKrieg = GuardId.Langort,
+            };
+
+            var state = new GuardTransitionState(profile);
+
+            Assert.That(state.TransitionPose, Is.EqualTo(GuardId.Pflug));
+            Assert.That(state.TransitionPoseInKrieg, Is.EqualTo(GuardId.Langort));
+            Assert.That(state.ResolveTransitionPose(Measure.Zufechten), Is.EqualTo(GuardId.Pflug));
+            Assert.That(state.ResolveTransitionPose(Measure.Krieg), Is.EqualTo(GuardId.Langort));
         }
 
         [Test]

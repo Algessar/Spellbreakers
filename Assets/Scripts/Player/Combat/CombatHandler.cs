@@ -28,6 +28,10 @@ public sealed class CombatHandler : MonoBehaviour
              "transitions that opt into the measure gate.")]
     [SerializeField] private float _opponentDistance = float.PositiveInfinity;
 
+    [Tooltip("Optional per-creature combat identity: how this body defends, how heavy it is, whether it " +
+             "can evade. Left empty, the combatant can both parry and avoid, as before.")]
+    [SerializeField] private CombatProfileAsset _combatProfile;
+
     private readonly Dictionary<string, int> _passStateHashes = new Dictionary<string, int>();
 
     private Animator _animator;
@@ -77,6 +81,11 @@ public sealed class CombatHandler : MonoBehaviour
         // "which object owns TargetingSystem" question ambiguous.
         Agent = new FencingAgent(CombatRules.CreateTransitionsForCombatant(), _initialGuard);
         Agent.PhaseChanged += OnPhaseChanged;
+
+        // Defence mode belongs to the body, and contact resolution reads it at the moment of the hit -
+        // long after any decision - so it has to live on the agent rather than be recomputed later.
+        if (_combatProfile != null)
+            _combatProfile.ApplyTo(this);
 
         _guardsLayer = _animator.GetLayerIndex("Guards");
         _passesLayer = _animator.GetLayerIndex("Passes");

@@ -19,6 +19,10 @@ public sealed class WeaponDamage : MonoBehaviour
 {
     [SerializeField, Min(0f)] private float _damage = 10f;
 
+    [Tooltip("Blade speed treated as a full-force strike by the deflection model. Faster hits are harder " +
+             "to turn aside; slower ones easier.")]
+    [SerializeField, Min(0.1f)] private float _referenceBladeSpeed = 8f;
+
     [Tooltip("Seconds the attacker is left staggered after its attack is parried or deflected.")]
     [SerializeField, Min(0f)] private float _parriedStaggerSeconds = 0.35f;
 
@@ -46,6 +50,13 @@ public sealed class WeaponDamage : MonoBehaviour
     private Vector3 _previousTip;
     private bool _hasPreviousSample;
     private bool _armed;
+
+    /// <summary>Blade direction and speed at the last sweep, read by the deflection model.</summary>
+    private Vector3 _lastTravelDirection;
+    private float _lastBladeSpeed;
+
+    /// <summary>Last deflection result, kept for diagnostics and the debug view.</summary>
+    private DeflectionResult _lastDeflection;
     private Damageable _selfTarget;
     private CombatTeam _selfTeam = CombatTeam.Neutral;
 
@@ -166,6 +177,18 @@ public sealed class WeaponDamage : MonoBehaviour
         var travel = ((currentBase + currentTip) - (previousBase + previousTip)) * 0.5f;
         var distance = travel.magnitude;
 
+        // The deflection model needs the blade's direction and speed at the instant of contact, so the
+        // sweep records them for ResolveContact rather than each contact re-deriving them.
+        if (distance > 0.0001f)
+        {
+            _lastTravelDirection = travel / distance;
+            _lastBladeSpeed = distance / Mathf.Max(0.0001f, Time.deltaTime);
+        }
+        else
+        {
+            _lastBladeSpeed = 0f;
+        }
+
         if (distance > 0.0001f)
         {
             var count = Physics.CapsuleCastNonAlloc(
@@ -211,12 +234,29 @@ public sealed class WeaponDamage : MonoBehaviour
 
         var hitBlade = other.GetComponentInParent<Blade>();
         var defenderHandler = ResolveHandler(target);
-        var outcome = ResolveOutcome(hitBlade, defenderHandler);
+
+        // How square the strike arrived: 1 means the blade travelled straight at the defender, 0 means it
+        // was already moving across or away from them. This is the "contact angle" of the deflection model.
+        var toDefender = target.AimPosition - _blade.TipPosition;
+        var contactAngle = toDefender.sqrMagnitude > 0.0001f && _lastTravelDirection.sqrMagnitude > 0.0001f
+            ? Mathf.Clamp01(Vector3.Dot(_lastTravelDirection, toDefender.normalized))
+            : 0f;
+
+        var outcome = ResolveOutcome(hitBlade, defenderHandler, contactAngle);
 
         Apply(outcome, target, defenderHandler);
     }
 
-    private CombatOutcome ResolveOutcome(Blade hitBlade, CombatHandler defenderHandler)
+    /// <summary>
+    /// Turns a contact into an outcome.
+    ///
+    /// The parry table is consulted for its *disposition* - this guard answers this line well or badly -
+    /// but it no longer decides the result. The design doc asks for deflection to be a gradient driven
+    /// by the physical relationship between the attack and the defender, so timing quality, contact
+    /// angle and the attacking blade's speed decide where on that gradient the contact actually lands,
+    /// and a creature that cannot parry never reaches the gradient at all.
+    /// </summary>
+    private CombatOutcome ResolveOutcome(Blade hitBlade, CombatHandler defenderHandler, float contactAngle)
     {
         // A blade with no live character behind it is just an obstacle: it cannot parry.
         if (hitBlade == null || defenderHandler == null || _owner?.Agent == null)
@@ -227,7 +267,8 @@ public sealed class WeaponDamage : MonoBehaviour
             return CombatOutcome.HitBody;
 
         var defender = defenderHandler.Agent;
-        var contact = ParryResolver.Resolve(
+
+        var baseline = ParryResolver.Resolve(
             attacker.ActiveTransition,
             defender.Current,
             defender.ActiveTransition,
@@ -235,14 +276,51 @@ public sealed class WeaponDamage : MonoBehaviour
             CombatRules.Parry,
             attacker.Progress01);
 
-        if (contact.Outcome == CombatOutcome.Undefined)
+        if (baseline.Outcome == CombatOutcome.Undefined)
         {
             // A hole in the parry table. Fail loudly but do not silently invent a rule.
             Debug.LogWarning($"[Weapon] Parry table has no entry for {attacker.ActiveTransition.Direction} " +
-                             $"against {defender.Current}; treating it as a hit.", this);
+                             $"against {defender.Current}; treating it as an unfavourable prior.", this);
         }
 
-        return contact.Outcome;
+        var input = new DeflectionInput(
+            TimingQuality(defender),
+            contactAngle,
+            _lastBladeSpeed,
+            _referenceBladeSpeed,
+            baseline.Outcome);
+
+        var result = DeflectionResolver.Resolve(input, defender.DefenceMode);
+        _lastDeflection = result;
+
+        if (_logContacts)
+        {
+            Debug.Log($"[Weapon] {name} vs {defenderHandler.CurrentGuard} ({defender.DefenceMode}): " +
+                      $"timing {input.TimingQuality:0.00} angle {contactAngle:0.00} " +
+                      $"speed {_lastBladeSpeed:0.0}/{_referenceBladeSpeed:0.0} -> {result}", this);
+        }
+
+        return result.Outcome;
+    }
+
+    /// <summary>
+    /// How well the defender timed its answer. Mid-window is best; a defence that barely catches the
+    /// edge of the window reads as worse. Holding a guard decays as the arrival grace runs out, which is
+    /// what stops "stand still and be safe" from working.
+    /// </summary>
+    private static float TimingQuality(FencingAgent defender)
+    {
+        if (defender.IsTransitioning && defender.ActiveTransition.Profile != null)
+        {
+            var profile = defender.ActiveTransition.Profile;
+            return DeflectionResolver.TimingQualityFromWindow(
+                defender.Progress01,
+                profile.ParryWindowStart,
+                profile.ParryWindowEnd);
+        }
+
+        var grace = defender.Table.GuardOr(defender.Current).ParryGraceSeconds;
+        return grace <= 0.0001f ? 0f : FencingMath.Clamp01(defender.ParryWindowRemaining / grace);
     }
 
     private void Apply(CombatOutcome outcome, Damageable target, CombatHandler defenderHandler)

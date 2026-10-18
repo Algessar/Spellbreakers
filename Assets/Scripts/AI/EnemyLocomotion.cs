@@ -63,6 +63,30 @@ namespace Spellbreakers.Ai
         private float _circleSign = 1f;
         private float _nextCircleFlipTime;
 
+        [Header("Evade")]
+        [SerializeField, Min(0.5f)] private float _evadeSpeed = 5f;
+
+        [Tooltip("Fallback recovery when the caller supplies none.")]
+        [SerializeField, Min(0f)] private float _evadeRecovery = 0.35f;
+
+        private float _evadeRemaining;
+        private float _recoveryRemaining;
+        private float _evadeSign = 1f;
+        private Vector3 _evadeDirection;
+        private Vector3 _lastLineDirection;
+
+        /// <summary>True while the body is actually slipping across the line.</summary>
+        public bool IsEvading => _evadeRemaining > 0f;
+
+        /// <summary>
+        /// True while recovering from an evade. This is the cost that keeps avoidance from strictly
+        /// dominating parrying: the slip gets you out of the way, the recovery is the opening that follows.
+        /// </summary>
+        public bool IsRecoveringFromEvade => _recoveryRemaining > 0f;
+
+        /// <summary>Whether the combatant is committed to an evade and cannot act normally.</summary>
+        public bool IsCommitted => IsEvading || IsRecoveringFromEvade;
+
         /// <summary>The distance the enemy is currently trying to hold.</summary>
         public float DesiredDistance => _desiredDistance;
 
@@ -99,6 +123,36 @@ namespace Spellbreakers.Ai
         }
 
         /// <summary>
+        /// Commits to a lateral slip across the attack's line: the doc's avoidance, performed.
+        ///
+        /// The side is chosen by alternating, because which way is "away from the attack" depends on the
+        /// incoming line and there is no guarantee the brain knows it. Alternating at least stops the
+        /// creature shivering into the same side repeatedly, and the direction is genuinely sideways -
+        /// an evade that merely backs off would lose to a committed lunge on distance.
+        /// </summary>
+        public void ExecuteEvade(float lateralMetres, float recoverySeconds = -1f)
+        {
+            if (_movement == null || _lastLineDirection.sqrMagnitude < 0.0001f)
+                return;
+
+            _evadeSign = -_evadeSign;
+            _evadeDirection = Vector3.Cross(Vector3.up, _lastLineDirection).normalized * _evadeSign;
+
+            var metres = Mathf.Max(0.1f, lateralMetres);
+            _evadeRemaining = Mathf.Clamp(metres / Mathf.Max(0.5f, _evadeSpeed), 0.08f, 1f);
+            _recoveryRemaining = recoverySeconds >= 0f ? recoverySeconds : _evadeRecovery;
+            IsNavigating = false;
+            _navigator?.Reset();
+        }
+
+        /// <summary>Cancels any evade in progress, e.g. on death or on losing the target.</summary>
+        public void CancelEvade()
+        {
+            _evadeRemaining = 0f;
+            _recoveryRemaining = 0f;
+        }
+
+        /// <summary>
         /// Steers for one frame. <paramref name="duel"/> is false while the enemy is still approaching
         /// from outside measure, which is when pathfinding is worth its cost.
         /// </summary>
@@ -126,6 +180,24 @@ namespace Spellbreakers.Ai
             }
 
             var toTargetDirection = toTarget / distance;
+            _lastLineDirection = toTargetDirection;
+
+            // A committed evade owns the body until it and its recovery are done: nothing else may
+            // interrupt it. That commitment is what stops avoidance from being free.
+            if (_evadeRemaining > 0f)
+            {
+                _evadeRemaining -= deltaTime;
+                _movement.SetIntent(ToIntent(_evadeDirection, _evadeSpeed));
+                return;
+            }
+
+            if (_recoveryRemaining > 0f)
+            {
+                // The opening after a slip: the body is still, so a fighter who read the evade punishes it.
+                _recoveryRemaining -= deltaTime;
+                _movement.SetIntent(Vector2.zero, false);
+                return;
+            }
 
             if (!duel && distance > _navMeshEngageDistance &&
                 _navigator.TryGetApproachDirection(position, target.position, out var pathDirection))

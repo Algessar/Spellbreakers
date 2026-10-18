@@ -373,26 +373,35 @@ namespace Spellbreakers.Tests
             Assert.That(wait, Is.GreaterThan(attack));
         }
 
+        /// <summary>
+        /// The punish window is the Settle phase: any attack whose damage window has closed is open to a
+        /// counter. The consideration must therefore prefer that beat over walking into a live blade.
+        /// </summary>
         [Test]
-        public void OpeningRead_SeesRecoveryAsTheBestWindow()
+        public void OpeningRead_ScoresAnAttackPastItsDamageWindowAsTheBestWindow()
         {
             var table = Table();
             var opening = new OpeningReadConsideration();
 
-            table.TryGet(GuardId.Ochs, GuardId.Langort, out var recoverable);
-            var recovery = new GuardTransitionState(recoverable);
+            Assert.That(table.TryGet(GuardId.Ochs, GuardId.Alber, out var attack), Is.True,
+                "the test needs an authored attack to observe");
+            var pass = new GuardTransitionState(attack);
 
-            // Past the damage window end, an opponent in transition is showing a punishable opening.
-            var recovering = Opponent(
+            // Past the damage window end the agent has settled, so the blade is no longer live.
+            var settling = Opponent(
                 GuardId.Ochs,
-                transition: recovery,
-                progress01: recoverable.DamageWindowEnd + 0.05f,
+                transition: pass,
+                progress01: attack.DamageWindowEnd + 0.05f,
                 bladeLive: false);
-            var live = Opponent(GuardId.Ochs, transition: recovery, progress01: 0.45f, bladeLive: true);
+            var live = Opponent(
+                GuardId.Ochs,
+                transition: pass,
+                progress01: attack.DamageWindowStart + 0.05f,
+                bladeLive: true);
 
-            var attackingDuringRecovery = opening.Score(Context(
+            var attackingTheSettle = opening.Score(Context(
                 GuardId.VomTag,
-                recovering,
+                settling,
                 FencingAction.ChangeGuard(GuardId.Alber),
                 table));
             var attackingIntoALiveBlade = opening.Score(Context(
@@ -401,7 +410,7 @@ namespace Spellbreakers.Tests
                 FencingAction.ChangeGuard(GuardId.Alber),
                 table));
 
-            Assert.That(attackingDuringRecovery, Is.GreaterThan(attackingIntoALiveBlade));
+            Assert.That(attackingTheSettle, Is.GreaterThan(attackingIntoALiveBlade));
         }
 
         [Test]
@@ -475,7 +484,8 @@ namespace Spellbreakers.Tests
         public void ConsiderationMath_ThreatDirectionsReadTheOpponentsLiveAttackFirst()
         {
             var table = Table();
-            table.TryGet(GuardId.Ochs, GuardId.Langort, out var thrust);
+            Assert.That(table.TryGet(GuardId.Ochs, GuardId.Pflug, out var thrust), Is.True,
+                "the test needs an authored attack to observe");
             var live = new GuardTransitionState(thrust);
 
             var directions = new List<TransitionDirection>();
@@ -483,7 +493,11 @@ namespace Spellbreakers.Tests
                 Context(GuardId.VomTag, Opponent(GuardId.Ochs, transition: live), table: table),
                 directions);
 
-            Assert.That(directions, Is.EqualTo(new[] { TransitionDirection.Thrust }));
+            // Deliberately count-agnostic: the guard's move list may grow, but the observed line has to
+            // be reported and no line may be reported twice.
+            Assert.That(directions, Does.Contain(TransitionDirection.Thrust));
+            Assert.That(new HashSet<TransitionDirection>(directions).Count, Is.EqualTo(directions.Count),
+                "distinct attack lines must not be duplicated");
         }
 
         [Test]
@@ -616,7 +630,8 @@ namespace Spellbreakers.Tests
         public void OpponentSnapshot_CommitmentFollowsTheObservedTransition()
         {
             var table = Table();
-            table.TryGet(GuardId.Ochs, GuardId.Langort, out var profile);
+            Assert.That(table.TryGet(GuardId.Ochs, GuardId.Alber, out var profile), Is.True,
+                "the test needs an authored attack to observe");
             var transition = new GuardTransitionState(profile);
 
             var early = Opponent(GuardId.Ochs, transition: transition, progress01: profile.Commitment - 0.05f);

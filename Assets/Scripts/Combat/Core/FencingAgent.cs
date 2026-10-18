@@ -26,6 +26,9 @@ namespace Spellbreakers.Combat
         private float _lastKnownDistance = float.PositiveInfinity;
         private Measure _lastKnownMeasure = Measure.OutOfRange;
         private GuardId _queuedGuard = GuardId.None;
+
+        /// <summary>Which side the queued request asked for, so a side switch survives the queue.</summary>
+        private GuardSide _queuedGuardSide = GuardSide.Right;
         private ReactionState _reaction;
 
         public FencingAgent(TransitionTable table, GuardId initialGuard)
@@ -51,8 +54,36 @@ namespace Spellbreakers.Combat
         /// <summary>The guard the combatant is in, or is transitioning towards completion of.</summary>
         public GuardId Current { get; private set; }
 
+        /// <summary>Which side the current guard is held on (design doc 4). Right unless authored otherwise.</summary>
+        public GuardSide CurrentSide { get; private set; } = GuardSide.Right;
+
         /// <summary>The guard held before the last completed transition.</summary>
         public GuardId Previous { get; private set; }
+
+        /// <summary>Which side the previous guard was held on.</summary>
+        public GuardSide PreviousSide { get; private set; } = GuardSide.Right;
+
+        /// <summary>The current guard including its side.</summary>
+        public GuardKey CurrentKey => new GuardKey(Current, CurrentSide);
+
+        /// <summary>
+        /// Which defensive answers this combatant actually has. Defaults to both, which is what every
+        /// combatant had before defence modes existed, so nothing changes unless something sets it.
+        ///
+        /// This lives on the agent rather than on the AI archetype because it is a property of the body,
+        /// not of the personality: a creature with no hard appendage cannot parry whatever its mood, and
+        /// the hit test needs to know that at the moment of contact - long after any decision was made.
+        /// </summary>
+        public DefenceMode DefenceMode { get; set; } = DefenceMode.Both;
+
+        /// <summary>True when this combatant can meet an attack with its own body or weapon.</summary>
+        public bool CanParry => (DefenceMode & DefenceMode.Parry) != 0;
+
+        /// <summary>True when this combatant can leave the attack's line instead of meeting it.</summary>
+        public bool CanAvoid => (DefenceMode & DefenceMode.Avoid) != 0;
+
+        /// <summary>The previous guard including its side.</summary>
+        public GuardKey PreviousKey => new GuardKey(Previous, PreviousSide);
 
         public GuardTransitionState ActiveTransition { get; private set; }
 
@@ -117,13 +148,22 @@ namespace Spellbreakers.Combat
         }
 
         /// <summary>
-        /// Asks to move to another guard. This is the single entry point for both player intent and AI
-        /// intent, so the two can never disagree about what is legal.
+        /// Asks to move to another guard on the side it is currently held on. Convenience overload; the
+        /// side-aware form below is the real entry point.
+        /// </summary>
+        public RequestResult RequestGuard(GuardId target, float distanceToOpponent)
+        {
+            return RequestGuard(target, CurrentSide, distanceToOpponent);
+        }
+
+        /// <summary>
+        /// Asks to move to another guard, on a given side. This is the single entry point for both player
+        /// intent and AI intent, so the two can never disagree about what is legal.
         ///
         /// A single-slot queue holds one request made mid-transition. Mashing three guards therefore
         /// keeps only the last one - deliberate, and documented, rather than accidental.
         /// </summary>
-        public RequestResult RequestGuard(GuardId target, float distanceToOpponent)
+        public RequestResult RequestGuard(GuardId target, GuardSide side, float distanceToOpponent)
         {
             _lastKnownDistance = distanceToOpponent;
             _lastKnownMeasure = ClassifyMeasure(distanceToOpponent);
@@ -140,16 +180,20 @@ namespace Spellbreakers.Combat
                 if (IsCommitted)
                 {
                     _queuedGuard = target;
+                    _queuedGuardSide = side;
                     return RequestResult.Queued;
                 }
 
                 CancelTransition("Superseded before commitment.");
             }
 
-            if (target == Current)
-                return RequestResult.Rejected;
-
-            if (!_table.TryGet(Current, target, out var profile) || profile == null)
+            // A request for the guard and side already held is a no-op, not a self-transition: the
+            // self-transition is reached through the table, and its ToSide decides whether it is a
+            // same-side re-attack or a side switch.
+            // The table is descriptive rather than a permission list (doc 3.1), so an unauthored pair
+            // still resolves - to a non-damaging traversal. Only a genuine no-op or a side the pairing
+            // was never authored for is refused.
+            if (!_table.TryResolve(CurrentKey, new GuardKey(target, side), out var profile) || profile == null)
                 return RequestResult.Rejected;
 
             var result = RequestResult.Accepted;
@@ -242,9 +286,16 @@ namespace Spellbreakers.Combat
         /// Sets the guard without playing a transition. Recovery path for a failed presentation, and for
         /// spawning a combatant directly into a pose.
         /// </summary>
+        /// <summary>Sets the guard directly on its default (right) side, without playing a transition.</summary>
         public void ForceGuard(GuardId guard)
         {
-            if (guard == GuardId.None)
+            ForceGuard(new GuardKey(guard, GuardSide.Right));
+        }
+
+        /// <summary>Sets the guard and the side it is held on, without playing a transition.</summary>
+        public void ForceGuard(GuardKey guard)
+        {
+            if (!guard.IsValid)
                 return;
 
             IsTransitioning = false;
@@ -255,10 +306,12 @@ namespace Spellbreakers.Combat
             _feintRemaining = -1f;
             _queuedGuard = GuardId.None;
             Previous = Current;
-            Current = guard;
+            PreviousSide = CurrentSide;
+            Current = guard.Id;
+            CurrentSide = guard.Side;
             SecondsInGuard = 0f;
-            ParryWindowRemaining = _table.GuardOr(guard).ParryGraceSeconds;
-            TipReach = _table.GuardOr(guard).TipReach;
+            ParryWindowRemaining = _table.GuardOr(guard.Id).ParryGraceSeconds;
+            TipReach = _table.GuardOr(guard.Id).TipReach;
             SetPhase(PassPhase.None);
             GuardChanged?.Invoke(Current);
         }
@@ -289,7 +342,9 @@ namespace Spellbreakers.Combat
             _reactionRemaining = 0f;
 
             Previous = restored;
+            PreviousSide = CurrentSide;
             Current = restored;
+            CurrentSide = GuardSide.Right;
             SecondsInGuard = 0f;
 
             var guardProfile = _table.GuardOr(restored);
@@ -349,7 +404,9 @@ namespace Spellbreakers.Combat
             var finished = ActiveTransition;
 
             Previous = Current;
+            PreviousSide = CurrentSide;
             Current = finished.To;
+            CurrentSide = finished.Profile != null ? finished.Profile.ToSide : CurrentSide;
             IsTransitioning = false;
             ActiveTransition = default;
             Progress01 = 0f;
@@ -367,9 +424,10 @@ namespace Spellbreakers.Combat
             TransitionCompleted?.Invoke(finished);
 
             var queued = _queuedGuard;
+            var queuedSide = _queuedGuardSide;
             _queuedGuard = GuardId.None;
             if (queued != GuardId.None)
-                RequestGuard(queued, _lastKnownDistance);
+                RequestGuard(queued, queuedSide, _lastKnownDistance);
         }
 
         /// <summary>

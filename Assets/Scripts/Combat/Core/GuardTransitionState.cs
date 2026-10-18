@@ -18,7 +18,29 @@ namespace Spellbreakers.Combat
 
         public GuardId To => Profile != null ? Profile.To : GuardId.None;
 
-        public GuardId PassThrough => Profile != null ? Profile.PassThrough : GuardId.None;
+        /// <summary>Source guard including which side it is held on.</summary>
+        public GuardKey FromKey => Profile != null ? Profile.FromKey : GuardKey.None;
+
+        /// <summary>Destination guard including which side it ends on.</summary>
+        public GuardKey ToKey => Profile != null ? Profile.ToKey : GuardKey.None;
+
+        /// <summary>Begins and ends in the same guard. Legal, per design doc 3.2.</summary>
+        public bool IsSelfTransition => Profile != null && Profile.IsSelfTransition;
+
+        /// <summary>A self-transition that changes side, e.g. R Vom Tag -> L Vom Tag.</summary>
+        public bool IsSideSwitch => Profile != null && Profile.IsSideSwitch;
+
+        /// <summary>The extreme pose this attack reaches through. Formerly "pass-through".</summary>
+        public GuardId TransitionPose => Profile != null ? Profile.TransitionPose : GuardId.None;
+
+        /// <summary>The transition pose used in Krieg, when the profile selects a different one.</summary>
+        public GuardId TransitionPoseInKrieg => Profile != null ? Profile.TransitionPoseInKrieg : GuardId.None;
+
+        /// <summary>The transition pose for a given measure.</summary>
+        public GuardId ResolveTransitionPose(Measure measure)
+        {
+            return Profile != null ? Profile.ResolveTransitionPose(measure) : GuardId.None;
+        }
 
         public TransitionDirection Direction => Profile != null ? Profile.Direction : TransitionDirection.Neutral;
 

@@ -17,6 +17,13 @@ namespace Spellbreakers.Combat
 
         private readonly Dictionary<GuardId, GuardProfile> _guards = new Dictionary<GuardId, GuardProfile>();
 
+        /// <summary>Duration of a synthesised traversal: a plain guard change, not an attack.</summary>
+        private const float SynthesizedDuration = 0.3f;
+
+        private readonly Dictionary<(GuardId From, GuardSide FromSide, GuardId To, GuardSide ToSide), TransitionProfile>
+            _synthesized =
+                new Dictionary<(GuardId, GuardSide, GuardId, GuardSide), TransitionProfile>();
+
         private readonly List<TransitionProfile> _ordered = new List<TransitionProfile>();
 
         public IReadOnlyList<TransitionProfile> Profiles => _ordered;
@@ -46,13 +53,97 @@ namespace Spellbreakers.Combat
             return true;
         }
 
+        /// <summary>
+        /// Authored lookup by guard pair only, ignoring sides. Prefer <see cref="TryResolve"/> unless the
+        /// caller genuinely does not care which side the transition is authored for.
+        /// </summary>
         public bool TryGet(GuardId from, GuardId to, out TransitionProfile profile)
         {
             profile = null;
-            if (from == GuardId.None || to == GuardId.None || from == to)
+            if (from == GuardId.None || to == GuardId.None)
                 return false;
 
             return _profiles.TryGetValue((from, to), out profile) && profile != null;
+        }
+
+        /// <summary>
+        /// Whether a guard pair with no authored expression is still traversable.
+        ///
+        /// Design doc 3.1: "Any guard should be able to transition to any other guard. The transition
+        /// table describes how a particular transition is expressed, not which transitions are
+        /// mechanically permitted." So the table is descriptive, not a permission list, and an unauthored
+        /// pair resolves to a plain traversal rather than being refused.
+        ///
+        /// The synthesised traversal deliberately carries **no damage window**: having not authored how
+        /// this transition attacks, it does not attack. That keeps the rule honest - movement between any
+        /// two guards is never forbidden, but no free attack is invented either.
+        /// </summary>
+        public bool AllowSynthesis { get; set; } = true;
+
+        /// <summary>
+        /// Resolves how moving between two guard keys is expressed: the authored profile if there is one,
+        /// otherwise a synthesised non-damaging traversal.
+        ///
+        /// A request for the exact state already held resolves only if it is an authored self-transition
+        /// (a Zornhau thrown from and returning to Vom Tag); otherwise it is a no-op and returns false.
+        /// </summary>
+        public bool TryResolve(GuardKey from, GuardKey to, out TransitionProfile profile)
+        {
+            profile = null;
+            if (!from.IsValid || !to.IsValid)
+                return false;
+
+            if (_profiles.TryGetValue((from.Id, to.Id), out var authored) && authored != null)
+            {
+                // The authored expression belongs to specific sides. Asking to execute it from or onto a
+                // side it was never authored for would run a pose that does not exist.
+                if (authored.FromSide == from.Side && authored.ToSide == to.Side)
+                {
+                    profile = authored;
+                    return true;
+                }
+
+                return false;
+            }
+
+            // Nothing authored. A request for the state already held is a no-op, not a traversal.
+            if (from == to || !AllowSynthesis)
+                return false;
+
+            profile = GetOrCreateSynthesized(from, to);
+            return true;
+        }
+
+        /// <summary>
+        /// Synthesised traversals are cached so repeated lookups do not allocate, and so identity is
+        /// stable for callers that compare profiles by reference.
+        /// </summary>
+        private TransitionProfile GetOrCreateSynthesized(GuardKey from, GuardKey to)
+        {
+            var key = (from.Id, from.Side, to.Id, to.Side);
+            if (_synthesized.TryGetValue(key, out var existing) && existing != null)
+                return existing;
+
+            var synthesized = new TransitionProfile(
+                from.Id,
+                to.Id,
+                TransitionDirection.Neutral,
+                SynthesizedDuration,
+                0f,
+                0f)
+            {
+                FromSide = from.Side,
+                ToSide = to.Side,
+                KriegDuration = SynthesizedDuration * 0.8f,
+                LungeDistance = 0f,
+                MinDistance = 0f,
+                MaxDistance = float.MaxValue,
+                PassStateName = "Langort",
+                Commitment = 0.2f,
+            };
+
+            _synthesized.Add(key, synthesized);
+            return synthesized;
         }
 
         /// <summary>Guard profile, falling back to a neutral default so callers never null-check.</summary>
@@ -116,7 +207,7 @@ namespace Spellbreakers.Combat
 
             throw new InvalidOperationException(
                 $"The default transition table authors {profile.From} -> {profile.To} more than once. " +
-                "Each guard change must appear exactly once, as either an attack or a recovery.");
+                "Each guard change must appear exactly once.");
         }
 
         /// <summary>
@@ -144,25 +235,11 @@ namespace Spellbreakers.Combat
             };
         }
 
-        /// <summary>
-        /// A recovery out of Langort back into a guard. No live blade: the pass has already resolved and
-        /// this is the beat an opponent is supposed to punish.
-        /// </summary>
-        private static TransitionProfile Recovery(GuardId to, float duration = 0.26f)
-        {
-            return new TransitionProfile(GuardId.Langort, to, TransitionDirection.Neutral, duration, 0f, 0f)
-            {
-                KriegDuration = duration * 0.8f,
-                LungeDistance = 0f,
-                MinDistance = 0f,
-                MaxDistance = float.MaxValue,
-                PassStateName = "Langort",
-                Commitment = 0.1f,
-            };
-        }
 
         /// <summary>
-        /// The canonical table: 22 attacks and 4 recoveries, which is 26 transitions over 6 guards.
+        /// The canonical table, aligned to dev doc section 6: 21 attacks over the five standing guards.
+        /// Langort appears as no row's source or destination - it is a pose attacks reach *through*, not
+        /// one a fighter holds - so the settle-back beat is the Settle phase after each damage window.
         ///
         /// Reach and parry grace come from how each guard actually sits; the attack set is the small,
         /// readable subset of the Lichtenauer plays this game supports.
@@ -181,59 +258,71 @@ namespace Spellbreakers.Combat
             table.AddGuard(new GuardProfile(GuardId.Langort, 1.80f, 0.22f));
             table.AddGuard(new GuardProfile(GuardId.IronGate, 1.40f, 0.32f));
 
-            // --- From Vom Tag: high, offensive. Zornhau and the thrust. ---
-            AddOrThrow(table, Attack(GuardId.VomTag, GuardId.Alber, TransitionDirection.Oberhau));
-            AddOrThrow(table, Attack(GuardId.VomTag, GuardId.Pflug, TransitionDirection.Oberhau, duration: 0.40f, lunge: 0.7f));
-            AddOrThrow(table, Attack(GuardId.VomTag, GuardId.Langort, TransitionDirection.Thrust, duration: 0.38f, lunge: 0.85f));
-            AddOrThrow(table, Attack(GuardId.VomTag, GuardId.Ochs, TransitionDirection.Mittelhau, duration: 0.44f));
-
-            // --- From Pflug: patient, low point. Thrust, rising cut, cross cut. ---
-            AddOrThrow(table, Attack(GuardId.Pflug, GuardId.Langort, TransitionDirection.Thrust, duration: 0.36f, lunge: 0.9f));
-            AddOrThrow(table, Attack(GuardId.Pflug, GuardId.Ochs, TransitionDirection.Mittelhau, duration: 0.44f));
-            AddOrThrow(table, Attack(GuardId.Pflug, GuardId.Alber, TransitionDirection.Unterhau, duration: 0.40f));
-            AddOrThrow(table, Attack(GuardId.Pflug, GuardId.VomTag, TransitionDirection.Mittelhau, duration: 0.46f));
-
-            // --- From Alber: the fool's guard invites, then snaps up. ---
-            AddOrThrow(table, Attack(GuardId.Alber, GuardId.VomTag, TransitionDirection.Unterhau, duration: 0.44f, damageStart: 0.34f));
-            AddOrThrow(table, Attack(GuardId.Alber, GuardId.Pflug, TransitionDirection.Unterhau, duration: 0.38f));
-            AddOrThrow(table, Attack(GuardId.Alber, GuardId.Langort, TransitionDirection.Thrust, duration: 0.40f, lunge: 0.85f));
-
-            // --- From Ochs: point in line, and the cut down across. ---
-            AddOrThrow(table, Attack(GuardId.Ochs, GuardId.Langort, TransitionDirection.Thrust, duration: 0.32f, lunge: 0.95f));
-            AddOrThrow(table, Attack(GuardId.Ochs, GuardId.Alber, TransitionDirection.Mittelhau, duration: 0.42f));
-            AddOrThrow(table, Attack(GuardId.Ochs, GuardId.Pflug, TransitionDirection.Mittelhau, duration: 0.42f));
-            AddOrThrow(table, Attack(GuardId.Ochs, GuardId.VomTag, TransitionDirection.Mittelhau, duration: 0.44f));
-
-            // --- From Langort: the long point, then finishing cuts. ---
-            AddOrThrow(table, Attack(GuardId.Langort, GuardId.Alber, TransitionDirection.Oberhau, duration: 0.40f, lunge: 0.5f));
-
-            // --- Into Iron Gate: it is a standing guard with its own input binding, so every guard the
-            // player can actually hold has to be able to drop into it. Without these the only inbound
-            // edge was the Langort recovery - and Langort is a pass-through pose, not a guard you can
-            // stand in - which left Iron Gate unreachable in play despite being bound and having its own
-            // Animator state.
-            AddOrThrow(table, Attack(GuardId.VomTag, GuardId.IronGate, TransitionDirection.Oberhau,
-                duration: 0.44f, lunge: 0.6f));
-            AddOrThrow(table, Attack(GuardId.Pflug, GuardId.IronGate, TransitionDirection.Thrust,
-                duration: 0.34f, lunge: 0.5f));
-            AddOrThrow(table, Attack(GuardId.Alber, GuardId.IronGate, TransitionDirection.Thrust,
-                duration: 0.38f, lunge: 0.6f));
-            AddOrThrow(table, Attack(GuardId.Ochs, GuardId.IronGate, TransitionDirection.Oberhau,
-                duration: 0.42f, lunge: 0.6f));
-
-            // --- From Iron Gate: kept to a thrust and a cut. ---
-            AddOrThrow(table, Attack(GuardId.IronGate, GuardId.Langort, TransitionDirection.Thrust, duration: 0.36f));
-            AddOrThrow(table, Attack(GuardId.IronGate, GuardId.Alber, TransitionDirection.Oberhau, duration: 0.44f));
-
-            // --- Recoveries: a pass resolves by settling back into a guard. ---
+            // --- The authored transition language, aligned to DEV/v0.2 section 6. ---
             //
-            // Alber is deliberately absent: Langort -> Alber is authored above as an Oberhau, because the
-            // cut down from the long point is a real answer with a live blade. That keeps the rule crisp -
-            // a transition with no damage window is a recovery - instead of "everything out of Langort is".
-            AddOrThrow(table, Recovery(GuardId.VomTag));
-            AddOrThrow(table, Recovery(GuardId.Pflug));
-            AddOrThrow(table, Recovery(GuardId.Ochs));
-            AddOrThrow(table, Recovery(GuardId.IronGate));
+            // Every row is an attack: the blade is live through the profile's damage window, and the beat
+            // to be punished is the Settle phase after that window closes. There are no "recovery"
+            // transitions any more. Langort is a pose an attack reaches *through*, never one a fighter
+            // holds, so no row ends in Langort and the settle-back beat is carried by Settle itself.
+            //
+            // The technique name is display-only. The transition pose is where the attack extends to:
+            // generally Langort at Zufechten, where reaching the opponent is the whole problem, and a
+            // tighter pose in Krieg, where there is no distance left to bridge.
+
+            void Author(
+                GuardId from,
+                GuardId to,
+                TransitionDirection direction,
+                string technique,
+                GuardId pose = GuardId.Langort,
+                GuardId poseInKrieg = GuardId.None,
+                float duration = 0.42f,
+                float lunge = 0.75f)
+            {
+                var authored = Attack(from, to, direction, duration: duration, lunge: lunge);
+                authored.TechniqueName = technique;
+                authored.TransitionPose = pose;
+                authored.TransitionPoseInKrieg = poseInKrieg;
+                AddOrThrow(table, authored);
+            }
+
+            // From Vom Tag: high and offensive. Zornhau and the thrust.
+            Author(GuardId.VomTag, GuardId.VomTag, TransitionDirection.Oberhau, "Zornhau", lunge: 0.35f);
+            Author(GuardId.VomTag, GuardId.Pflug, TransitionDirection.Thrust, "Stichen", lunge: 0.7f);
+            Author(GuardId.VomTag, GuardId.Alber, TransitionDirection.Oberhau, "Zornhau");
+            Author(GuardId.VomTag, GuardId.Ochs, TransitionDirection.Oberhau, "Zornhau");
+            Author(GuardId.VomTag, GuardId.IronGate, TransitionDirection.Oberhau, "Zornhau", lunge: 0.6f);
+
+            // From Pflug: patient, low point. Every answer out of it is a thrust.
+            Author(GuardId.Pflug, GuardId.VomTag, TransitionDirection.Thrust, "Stichen", duration: 0.46f);
+            Author(GuardId.Pflug, GuardId.IronGate, TransitionDirection.Thrust, "Stichen", duration: 0.34f, lunge: 0.5f);
+            Author(GuardId.Pflug, GuardId.Alber, TransitionDirection.Thrust, "Stichen", duration: 0.40f);
+            Author(GuardId.Pflug, GuardId.Ochs, TransitionDirection.Thrust, "Stichen", duration: 0.44f);
+
+            // From Alber: the fool's guard invites, then snaps up or across.
+            Author(GuardId.Alber, GuardId.VomTag, TransitionDirection.Unterhau, "Unterhau",
+                pose: GuardId.Pflug, poseInKrieg: GuardId.Langort, duration: 0.44f);
+            Author(GuardId.Alber, GuardId.Pflug, TransitionDirection.Thrust, "Stichen", duration: 0.38f);
+            Author(GuardId.Alber, GuardId.Ochs, TransitionDirection.Unterhau, "Unterhau");
+            Author(GuardId.Alber, GuardId.IronGate, TransitionDirection.Mittelhau, "Mittelhau",
+                pose: GuardId.Pflug, lunge: 0.6f);
+
+            // From Ochs: point in line, and the cut down from it.
+            Author(GuardId.Ochs, GuardId.VomTag, TransitionDirection.Oberhau, "Schwerhau", duration: 0.44f);
+            Author(GuardId.Ochs, GuardId.Pflug, TransitionDirection.Thrust, "Stichen", duration: 0.42f);
+            Author(GuardId.Ochs, GuardId.Alber, TransitionDirection.Oberhau, "Oberhau", duration: 0.42f);
+            Author(GuardId.Ochs, GuardId.IronGate, TransitionDirection.Oberhau, "Zornhau",
+                poseInKrieg: GuardId.Pflug, lunge: 0.6f);
+
+            // From Iron Gate: a standing guard with its own binding, so it needs an answer to each guard.
+            Author(GuardId.IronGate, GuardId.VomTag, TransitionDirection.Unterhau, "Unterhau",
+                pose: GuardId.Pflug, poseInKrieg: GuardId.Langort);
+            Author(GuardId.IronGate, GuardId.Pflug, TransitionDirection.Thrust, "Stichen",
+                pose: GuardId.Pflug, poseInKrieg: GuardId.Langort, duration: 0.36f);
+            Author(GuardId.IronGate, GuardId.Alber, TransitionDirection.Mittelhau, "Mittelhau",
+                pose: GuardId.Pflug, poseInKrieg: GuardId.Langort, duration: 0.44f);
+            Author(GuardId.IronGate, GuardId.Ochs, TransitionDirection.Unterhau, "Unterhau",
+                pose: GuardId.Pflug, poseInKrieg: GuardId.Langort);
 
             return table;
         }

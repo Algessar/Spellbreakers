@@ -78,6 +78,10 @@ namespace Spellbreakers.Combat.Ai
     /// </summary>
     public readonly struct FencingContext
     {
+        /// <summary>
+        /// Backward-compatible overload. Defaults the combatant to being able to both parry and avoid,
+        /// which is the behaviour every caller had before defence modes existed.
+        /// </summary>
         public FencingContext(
             GuardId selfGuard,
             GuardTransitionState selfTransition,
@@ -94,6 +98,43 @@ namespace Spellbreakers.Combat.Ai
             FencingArchetype archetype,
             GuardId lastRequestedGuard,
             float random01)
+            : this(
+                selfGuard,
+                selfTransition,
+                selfProgress01,
+                selfHealthFraction,
+                selfReaction,
+                selfVor,
+                selfTipReach,
+                elapsedSeconds,
+                opponent,
+                action,
+                transitionTable,
+                parryTable,
+                archetype,
+                lastRequestedGuard,
+                random01,
+                DefenceMode.Both)
+        {
+        }
+
+        public FencingContext(
+            GuardId selfGuard,
+            GuardTransitionState selfTransition,
+            float selfProgress01,
+            float selfHealthFraction,
+            ReactionState selfReaction,
+            bool selfVor,
+            float selfTipReach,
+            float elapsedSeconds,
+            OpponentSnapshot opponent,
+            FencingAction action,
+            TransitionTable transitionTable,
+            ParryTable parryTable,
+            FencingArchetype archetype,
+            GuardId lastRequestedGuard,
+            float random01,
+            DefenceMode selfDefenceMode)
         {
             SelfGuard = selfGuard;
             SelfTransition = selfTransition;
@@ -110,7 +151,18 @@ namespace Spellbreakers.Combat.Ai
             Archetype = archetype;
             LastRequestedGuard = lastRequestedGuard;
             Random01 = random01;
+            SelfDefenceMode = selfDefenceMode;
         }
+
+        /// <summary>
+        /// Which defensive answers this combatant actually has. A creature with no hard appendage cannot
+        /// parry and must avoid instead; that choice belongs to the creature, not to the player's rules.
+        /// </summary>
+        public DefenceMode SelfDefenceMode { get; }
+
+        public bool CanParry => (SelfDefenceMode & DefenceMode.Parry) != 0;
+
+        public bool CanAvoid => (SelfDefenceMode & DefenceMode.Avoid) != 0;
 
         public GuardId SelfGuard { get; }
 
@@ -189,7 +241,8 @@ namespace Spellbreakers.Combat.Ai
                 ParryTable,
                 Archetype,
                 LastRequestedGuard,
-                random01);
+                random01,
+                SelfDefenceMode);
         }
     }
 }

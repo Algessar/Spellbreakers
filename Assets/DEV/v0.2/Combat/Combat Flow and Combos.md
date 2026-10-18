@@ -1,3 +1,18 @@
+[under revision]
+
+The current implementation of combat is stable. FromGuard -> Transition -> ToGuard is working as it should. 
+
+# Perfect Actions and Triggered Effects
+
+Triggered effects can happen on:
+
+Parry: parrying at a certain timing should produce a Perfect Parry
+Bind: Bind should allow for a quick follow-up (similar to the mechanic in Wind-waker, where
+you can let your shield down and wait for a strike. If the timing is hit, you get a special roll- or
+jump attack, depending on stick direction). Effect of bind->follow-up is undecided as of now.
+Deflect: [Undecided]
+
+
 # Combat Flow and Combos
 
 The game should not rely on traditional canned combo strings.

@@ -141,7 +141,11 @@ namespace Spellbreakers.Ai
 
             Agent.Vor = InDuel && !Agent.IsTransitioning && !Snapshot.BladeLive && !Snapshot.InParryWindow;
 
-            if (Brain.Tick(deltaTime, BuildContext(Snapshot)))
+            // A committed evade - the slip and its recovery - is the opening that follows it. Suppressing
+            // decisions here is what gives avoidance a real cost instead of making it a free dodge.
+            var committedToEvade = _locomotion != null && _locomotion.IsCommitted;
+
+            if (!committedToEvade && Brain.Tick(deltaTime, BuildContext(Snapshot)))
             {
                 Execute(Brain.Choice);
 
@@ -173,7 +177,8 @@ namespace Spellbreakers.Ai
                 CombatRules.Parry,
                 Archetype,
                 Brain.LastRequestedGuard,
-                0f);
+                0f,
+                Agent.DefenceMode);
         }
 
         /// <summary>
@@ -197,6 +202,12 @@ namespace Spellbreakers.Ai
                 case FencingActionKind.Retreat:
                     // Positive StepDistance closes, so the desired distance moves the opposite way.
                     _locomotion?.AdjustDesiredDistance(-action.StepDistance);
+                    break;
+
+                case FencingActionKind.Evade:
+                    // The creature's own recovery is the cost of the slip; the archetype supplies it so
+                    // avoidance remains tunable per enemy rather than being a global constant.
+                    _locomotion?.ExecuteEvade(action.LateralDistance, Archetype?.EvadeRecoverySeconds ?? -1f);
                     break;
 
                 case FencingActionKind.Wait:

@@ -87,7 +87,7 @@ Alber
 
 ## 2.3 No Conventional Attack System
 
-The game should not be built around conventional:
+The game should NOT be built around conventional:
 
 - Light Attack
     

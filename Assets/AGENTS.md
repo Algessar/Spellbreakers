@@ -2,12 +2,12 @@
 
 `Assets/DEV/` contains the project's design and technical documentation.
 
-Treat current DevDoc material as project context, but prefer the actual source code and Unity assets when determining
+Treat current DevDoc material as project context, but reference the actual source code and Unity assets when determining 
 how the current implementation behaves.
 
 Do not assume archived or explicitly obsolete documentation represents the current design.
 
-If a document begins with `[obsolete]` or `ai-ignore`, skip it completely.
+If a document begins with `[obsolete]` or `[ai-ignore]`, skip it completely.
 If a document begins with `[under revision]`, it is not canonical and should be treated with caution.
 
 ## Task Boundaries
@@ -19,3 +19,7 @@ If a document begins with `[under revision]`, it is not canonical and should be 
 Example: "What is the combat system currently capable of, and approximately how extensive a refactor would it need to comply with what is written in Enemy Combat.md?"
 
 This is an assessment request, not an implementation request.
+
+## Combat Specific
+
+If we are getting confused about the combat rule implementation, always reference how Lichtenauer actually treats combat!

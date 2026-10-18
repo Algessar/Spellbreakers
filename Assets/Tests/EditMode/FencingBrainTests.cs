@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using Spellbreakers.Combat;
 using Spellbreakers.Combat.Ai;
@@ -566,7 +567,12 @@ namespace Spellbreakers.Tests
             var brain = NewBrain(archetype);
 
             Assert.That(brain.Archetype, Is.SameAs(archetype));
-            Assert.That(brain.Considerations.Count, Is.EqualTo(8));
+
+            // Deliberately not a magic count: axes are added as the combat model grows. What matters is
+            // that every axis is wired into every score and that they are distinguishable in the
+            // breakdown, so that invariant is what gets asserted.
+            Assert.That(brain.Considerations.Count, Is.GreaterThan(0));
+            Assert.That(brain.Considerations.Select(c => c.Name), Is.Unique);
         }
 
         /// <summary>

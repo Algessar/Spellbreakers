@@ -28,28 +28,89 @@ namespace Spellbreakers.Combat
                 throw new ArgumentException("A transition needs a real source guard.", nameof(from));
             if (to == GuardId.None)
                 throw new ArgumentException("A transition needs a real destination guard.", nameof(to));
-            if (from == to)
-                throw new ArgumentException($"A transition from and to '{from}' is not an attack.", nameof(to));
 
+            // A transition may legitimately begin and end in the same guard (design doc 3.2): a Zornhau
+            // thrown from Vom Tag returns to Vom Tag. The system must not assume the destination always
+            // differs from the source, so this is no longer rejected. Whether a given self-transition is
+            // an attack or a no-op is decided entirely by its authored damage window.
             From = from;
             To = to;
             Direction = direction;
             Duration = FencingMath.Max(0.01f, duration);
             DamageWindowStart = FencingMath.Clamp01(damageWindowStart);
             DamageWindowEnd = FencingMath.Clamp01(damageWindowEnd);
-            DisplayName = $"{GuardIds.ToDisplayName(from)} -> {GuardIds.ToDisplayName(to)}";
         }
 
         public GuardId From { get; }
 
         public GuardId To { get; }
 
-        /// <summary>Every transition passes through Langort; that is the shape of the combat language.</summary>
-        public GuardId PassThrough { get; set; } = GuardId.Langort;
+        /// <summary>Which side the source guard is held on. Right is the authored default (doc 4).</summary>
+        public GuardSide FromSide { get; set; } = GuardSide.Right;
+
+        /// <summary>Which side the destination guard ends on.</summary>
+        public GuardSide ToSide { get; set; } = GuardSide.Right;
+
+        public GuardKey FromKey => new GuardKey(From, FromSide);
+
+        public GuardKey ToKey => new GuardKey(To, ToSide);
+
+        /// <summary>Begins and ends in the same guard.</summary>
+        public bool IsSelfTransition => From == To;
+
+        /// <summary>
+        /// A self-transition that changes which side the guard is held on - the doc's
+        /// "R Vom Tag -> L Vom Tag = Zornhau" alternative to a same-side self-transition.
+        /// </summary>
+        public bool IsSideSwitch => IsSelfTransition && FromSide != ToSide;
+
+        /// <summary>
+        /// The technique's name for authoring and debug display only - "Zornhau", "Stichen", "Schwerhau".
+        /// It carries no mechanics: the same transition behaves identically whether or not it is named,
+        /// and the doc's Zornhau/Oberhau distinction is deliberately not a mechanical one.
+        /// </summary>
+        public string TechniqueName { get; set; }
+
+        /// <summary>Human-readable identity, built from the guard keys plus the optional technique name.</summary>
+        public string DisplayName
+        {
+            get
+            {
+                var name = GuardIds.ToDisplayName(FromKey) + " -> " + GuardIds.ToDisplayName(ToKey);
+                if (IsSideSwitch)
+                    name += " (side switch)";
+
+                return string.IsNullOrEmpty(TechniqueName) ? name : name + " [" + TechniqueName + "]";
+            }
+        }
+
+        /// <summary>
+        /// The pose the transition reaches through - the doc's TransitionPose, formerly "pass-through".
+        ///
+        /// Every attack has to extend to reach its opponent, so the transition pose is the extreme
+        /// position the attack passes through rather than a guard the fighter holds. Langort is the
+        /// general case at Zufechten, where reaching is the whole problem.
+        /// </summary>
+        public GuardId TransitionPose { get; set; } = GuardId.Langort;
+
+        /// <summary>
+        /// The transition pose used instead when the fight is in Krieg, where there is no distance left
+        /// to bridge and extending is counter-productive. None means "same as <see cref="TransitionPose"/>".
+        ///
+        /// This is what the doc's "Langort / Pflug*" entries express: the same transition selects a
+        /// different intermediate pose depending on measure.
+        /// </summary>
+        public GuardId TransitionPoseInKrieg { get; set; } = GuardId.None;
+
+        /// <summary>The transition pose for the current measure, falling back to the general one.</summary>
+        public GuardId ResolveTransitionPose(Measure measure)
+        {
+            return measure == Measure.Krieg && TransitionPoseInKrieg != GuardId.None
+                ? TransitionPoseInKrieg
+                : TransitionPose;
+        }
 
         public TransitionDirection Direction { get; set; }
-
-        public string DisplayName { get; }
 
         /// <summary>Base duration in seconds, used at Zufechten and beyond.</summary>
         public float Duration { get; set; }
@@ -172,7 +233,11 @@ namespace Spellbreakers.Combat
         {
             return new TransitionProfile(From, To, Direction, Duration, DamageWindowStart, DamageWindowEnd)
             {
-                PassThrough = PassThrough,
+                FromSide = FromSide,
+                ToSide = ToSide,
+                TechniqueName = TechniqueName,
+                TransitionPose = TransitionPose,
+                TransitionPoseInKrieg = TransitionPoseInKrieg,
                 KriegDuration = KriegDuration,
                 MinDistance = MinDistance,
                 MaxDistance = MaxDistance,

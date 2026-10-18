@@ -51,6 +51,7 @@ namespace Spellbreakers.Combat.Ai
             _considerations.Add(new CommitRiskConsideration());
             _considerations.Add(new SpacingConsideration());
             _considerations.Add(new PredictabilityConsideration());
+            _considerations.Add(new EvasionConsideration());
             _considerations.Add(new BaselineConsideration());
         }
 
@@ -151,6 +152,10 @@ namespace Spellbreakers.Combat.Ai
                 var step = FencingMath.Max(0.1f, _archetype.StepDistance);
                 _actions.Add(FencingAction.Step(step));
                 _actions.Add(FencingAction.Retreat(step));
+
+                // Avoidance is only an option for a combatant that can actually leave the line.
+                if (context.CanAvoid)
+                    _actions.Add(FencingAction.Evade(FencingMath.Max(0.1f, _archetype.EvadeDistance)));
             }
 
             if (context.SelfInTransition)

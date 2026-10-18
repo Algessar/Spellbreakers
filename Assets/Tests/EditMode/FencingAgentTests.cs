@@ -46,6 +46,20 @@ namespace Spellbreakers.Tests
             return new FencingAgent(table, from);
         }
 
+        /// <summary>
+        /// A table with two guard profiles and no authored transitions, so a request is guaranteed to
+        /// exercise synthesis. The default table cannot serve: 21 of its 25 non-Langort pairs are
+        /// authored, and the four unauthored self-pairs are refused as no-ops.
+        /// </summary>
+        private static FencingAgent NewAgentWithoutAuthoredTransitions(GuardId from, GuardId to)
+        {
+            var table = new TransitionTable();
+            table.AddGuard(new GuardProfile(from));
+            table.AddGuard(new GuardProfile(to));
+
+            return new FencingAgent(table, from);
+        }
+
         /// <summary>Ticks until the transition finishes, so tests do not encode a magic tick count.</summary>
         private static int DriveToCompletion(FencingAgent agent, int maxTicks = MaxTicksForOneTransition)
         {
@@ -116,31 +130,94 @@ namespace Spellbreakers.Tests
             Assert.That(NewAgent().RequestGuard(target, GenerousDistance), Is.EqualTo(RequestResult.Rejected));
         }
 
+        /// <summary>
+        /// Requesting the guard already held is not automatically a no-op: if a self-transition is
+        /// authored for it (doc 3.2), it is a real attack - the Zornhau thrown from Vom Tag returns to
+        /// Vom Tag. When nothing is authored, it is a genuine no-op and must be refused rather than
+        /// silently starting a traversal to where the fighter already is.
+        /// </summary>
         [Test]
-        public void RequestGuard_RejectsTheGuardItIsAlreadyIn()
+        public void RequestGuard_OfTheGuardAlreadyHeldRunsTheAuthoredSelfTransition()
         {
-            var agent = NewAgent();
+            var agent = NewAgent(GuardId.VomTag);
 
-            Assert.That(agent.RequestGuard(StartGuard, GenerousDistance), Is.EqualTo(RequestResult.Rejected));
-            Assert.That(agent.IsTransitioning, Is.False);
+            Assert.That(agent.RequestGuard(GuardId.VomTag, GenerousDistance), Is.EqualTo(RequestResult.Accepted));
+            Assert.That(agent.IsTransitioning, Is.True);
+            Assert.That(agent.ActiveTransition.IsSelfTransition, Is.True);
+            Assert.That(agent.ActiveTransition.Profile.HasDamageWindow, Is.True);
         }
 
-        /// <summary>Iron Gate settles back into Langort or Alber but not into Vom Tag, so the table -
-        /// not a special case - must be what refuses that pair.</summary>
         [Test]
-        public void RequestGuard_RejectsAPairTheTableDoesNotAuthor()
+        public void RequestGuard_OfTheGuardAlreadyHeldIsANoOpWhenNoSelfTransitionIsAuthored()
         {
-            var agent = NewAgent(GuardId.IronGate);
+            // Alber has no authored self-transition, so asking for it says nothing at all.
+            var agent = NewAgent(GuardId.Alber);
 
-            Assert.That(agent.RequestGuard(GuardId.VomTag, GenerousDistance), Is.EqualTo(RequestResult.Rejected));
-            Assert.That(agent.Table.TryGet(GuardId.IronGate, GuardId.VomTag, out _), Is.False);
+            Assert.That(agent.RequestGuard(GuardId.Alber, GenerousDistance), Is.EqualTo(RequestResult.Rejected));
             Assert.That(agent.IsTransitioning, Is.False);
         }
 
         /// <summary>
+        /// Design doc 3.1: the table describes how a transition is expressed, not which transitions are
+        /// mechanically permitted, so an unauthored pair is still traversable. Because nothing authored
+        /// how it attacks, it resolves as a plain guard change with no damage window - movement is never
+        /// forbidden, but no free attack is invented either.
+        /// </summary>
+        [Test]
+        public void RequestGuard_AllowsAnUnauthoredPairAsANonDamagingTraversal()
+        {
+            var agent = NewAgentWithoutAuthoredTransitions(GuardId.IronGate, GuardId.VomTag);
+
+            Assert.That(agent.Table.TryGet(GuardId.IronGate, GuardId.VomTag, out _), Is.False,
+                "this pair genuinely has no authored expression");
+
+            Assert.That(agent.RequestGuard(GuardId.VomTag, GenerousDistance), Is.EqualTo(RequestResult.Accepted));
+            Assert.That(agent.IsTransitioning, Is.True);
+            Assert.That(agent.ActiveTransition.Profile.HasDamageWindow, Is.False,
+                "an unauthored traversal must not act as an attack");
+            Assert.That(agent.ActiveTransition.Direction, Is.EqualTo(TransitionDirection.Neutral));
+        }
+
+        /// <summary>A table can opt out of synthesis when a creature genuinely has a fixed move list.</summary>
+        [Test]
+        public void RequestGuard_RejectsAnUnauthoredPairWhenSynthesisIsDisabled()
+        {
+            var agent = NewAgentWithoutAuthoredTransitions(GuardId.IronGate, GuardId.VomTag);
+            agent.Table.AllowSynthesis = false;
+
+            Assert.That(agent.RequestGuard(GuardId.VomTag, GenerousDistance), Is.EqualTo(RequestResult.Rejected));
+            Assert.That(agent.IsTransitioning, Is.False);
+        }
+
+        /// <summary>
+        /// Design doc 3.2: a transition may begin and end in the same guard - "Vom Tag -> Vom Tag =
+        /// Zornhau". This is the end-to-end check that such a pair can actually be authored, looked up
+        /// and executed, not merely constructed.
+        /// </summary>
+        [Test]
+        public void RequestGuard_ReachesAnAuthoredSelfTransition()
+        {
+            var table = new TransitionTable();
+            table.AddGuard(new GuardProfile(GuardId.VomTag));
+            table.Add(new TransitionProfile(
+                GuardId.VomTag,
+                GuardId.VomTag,
+                TransitionDirection.Oberhau,
+                0.42f,
+                0.3f,
+                0.6f));
+
+            var agent = new FencingAgent(table, GuardId.VomTag);
+
+            Assert.That(agent.RequestGuard(GuardId.VomTag, GenerousDistance), Is.EqualTo(RequestResult.Accepted));
+            Assert.That(agent.ActiveTransition.IsSelfTransition, Is.True);
+            Assert.That(agent.ActiveTransition.Profile.HasDamageWindow, Is.True, "a self-transition is still an attack");
+        }
+
+        /// <summary>
         /// Iron Gate is a standing guard with its own binding, so every guard the player can hold must
-        /// be able to reach it. Its only inbound edge used to be the Langort recovery, and since Langort
-        /// is a pass-through pose rather than a guard you can stand in, the key did nothing at all.
+        /// author a way into it. Acceptance alone would not prove that: an unauthored pair is still
+        /// traversable as a plain, attackless synthesis, so the authored edge is asserted explicitly.
         /// </summary>
         [TestCase(GuardId.VomTag)]
         [TestCase(GuardId.Pflug)]
@@ -149,6 +226,9 @@ namespace Spellbreakers.Tests
         public void RequestGuard_CanEnterIronGateFromEveryStandingGuard(GuardId from)
         {
             var agent = NewAgent(from);
+
+            Assert.That(agent.Table.TryGet(from, GuardId.IronGate, out _), Is.True,
+                $"{from} -> Iron Gate must be authored, not merely synthesised");
 
             Assert.That(agent.RequestGuard(GuardId.IronGate, GenerousDistance), Is.EqualTo(RequestResult.Accepted));
             Assert.That(agent.IsTransitioning, Is.True);

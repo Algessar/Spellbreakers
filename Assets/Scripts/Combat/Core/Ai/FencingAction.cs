@@ -14,6 +14,13 @@ namespace Spellbreakers.Combat.Ai
 
         /// <summary>Move away from the opponent to restore measure.</summary>
         Retreat = 3,
+
+        /// <summary>
+        /// Break the line across it: the doc's avoidance. Distinct from <see cref="Retreat"/> because
+        /// opening the measure and leaving the attack's line are different answers - retreating from a
+        /// committed lunge still loses, whereas stepping off the line does not.
+        /// </summary>
+        Evade = 4,
     }
 
     /// <summary>
@@ -22,11 +29,17 @@ namespace Spellbreakers.Combat.Ai
     /// </summary>
     public readonly struct FencingAction
     {
-        private FencingAction(FencingActionKind kind, GuardId targetGuard, float stepDistance, string name)
+        private FencingAction(
+            FencingActionKind kind,
+            GuardId targetGuard,
+            float stepDistance,
+            float lateralDistance,
+            string name)
         {
             Kind = kind;
             TargetGuard = targetGuard;
             StepDistance = stepDistance;
+            LateralDistance = lateralDistance;
             Name = name;
         }
 
@@ -37,19 +50,27 @@ namespace Spellbreakers.Combat.Ai
 
         /// <summary>
         /// Metres along the line, signed so that positive means *closer*. A step in therefore has a
-        /// positive value; a retreat is negative.
+        /// positive value; a retreat is negative. An evade does not change the line distance, so it is 0.
         /// </summary>
         public float StepDistance { get; }
 
+        /// <summary>
+        /// Metres across the line, signed. Positive and negative are the two directions of the slip;
+        /// which way is "left" is the locomotion layer's business, not the brain's.
+        /// </summary>
+        public float LateralDistance { get; }
+
         public string Name { get; }
 
-        public static FencingAction Wait { get; } = new FencingAction(FencingActionKind.Wait, GuardId.None, 0f, "Wait");
+        public static FencingAction Wait { get; } =
+            new FencingAction(FencingActionKind.Wait, GuardId.None, 0f, 0f, "Wait");
 
         public static FencingAction ChangeGuard(GuardId guard)
         {
             return new FencingAction(
                 FencingActionKind.ChangeGuard,
                 guard,
+                0f,
                 0f,
                 "Change to " + GuardIds.ToDisplayName(guard));
         }
@@ -59,7 +80,7 @@ namespace Spellbreakers.Combat.Ai
             var distance = FencingMath.Max(0f, metres);
             return distance <= 0f
                 ? Wait
-                : new FencingAction(FencingActionKind.Step, GuardId.None, distance, $"Step in {distance:0.0}m");
+                : new FencingAction(FencingActionKind.Step, GuardId.None, distance, 0f, $"Step in {distance:0.0}m");
         }
 
         public static FencingAction Retreat(float metres)
@@ -67,10 +88,33 @@ namespace Spellbreakers.Combat.Ai
             var distance = FencingMath.Max(0f, metres);
             return distance <= 0f
                 ? Wait
-                : new FencingAction(FencingActionKind.Retreat, GuardId.None, -distance, $"Retreat {distance:0.0}m");
+                : new FencingAction(FencingActionKind.Retreat, GuardId.None, -distance, 0f, $"Retreat {distance:0.0}m");
         }
 
-        public bool IsMovement => Kind == FencingActionKind.Step || Kind == FencingActionKind.Retreat;
+        /// <summary>
+        /// A lateral slip out of the attack's line. The sign picks which way; the magnitude is how far.
+        /// </summary>
+        public static FencingAction Evade(float lateralMetres)
+        {
+            var distance = FencingMath.Max(0f, lateralMetres);
+            return distance <= 0f
+                ? Wait
+                : new FencingAction(FencingActionKind.Evade, GuardId.None, 0f, distance, $"Evade {distance:0.0}m");
+        }
+
+        /// <summary>Any action that moves the body. Used where a check cares about commitment, not direction.</summary>
+        public bool IsMovement =>
+            Kind == FencingActionKind.Step ||
+            Kind == FencingActionKind.Retreat ||
+            Kind == FencingActionKind.Evade;
+
+        /// <summary>Moves along the line, and therefore changes the measure.</summary>
+        public bool IsLineMovement =>
+            Kind == FencingActionKind.Step || Kind == FencingActionKind.Retreat;
+
+        /// <summary>Stays in the line, and therefore ignores the attack's direction.</summary>
+        public bool IsInLine =>
+            Kind != FencingActionKind.Evade;
 
         public override string ToString()
         {

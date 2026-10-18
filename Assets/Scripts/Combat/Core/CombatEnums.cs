@@ -71,7 +71,32 @@ namespace Spellbreakers.Combat
         Deflect = 4,
     }
 
-    /// <summary>What happened when a guard change was requested.</summary>
+    /// <summary>
+    /// How a combatant is able to defend.
+    ///
+    /// The design doc wants deflection to work on the physical relationship between the attack and the
+    /// defender rather than on the attacker's anatomy, and it expects avoidance and parrying to be
+    /// different answers. A creature with nothing hard enough to meet a blade falls back to avoidance
+    /// entirely; a creature with a hard carapace can do both.
+    /// </summary>
+    [Flags]
+    public enum DefenceMode
+    {
+        /// <summary>Cannot defend at all. Every incoming attack resolves on its merits.</summary>
+        None = 0,
+
+        /// <summary>Can meet an incoming attack with its own body or weapon and deflect it.</summary>
+        Parry = 1,
+
+        /// <summary>Can stay out of the attack's line entirely.</summary>
+        Avoid = 2,
+
+        Both = Parry | Avoid,
+    }
+
+    /// <summary>
+    /// What happened when a guard change was requested.
+    /// </summary>
     public enum RequestResult
     {
         /// <summary>The transition is running and its blade can land.</summary>

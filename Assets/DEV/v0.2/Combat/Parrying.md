@@ -1,5 +1,5 @@
 # 13. Parrying
-
+[seems generally correct]
 Parrying is a core combat mechanic.
 
 The player should be rewarded for correctly reading and timing defensive responses.

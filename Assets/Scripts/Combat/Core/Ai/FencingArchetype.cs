@@ -59,6 +59,21 @@ namespace Spellbreakers.Combat.Ai
         public float PredictabilityWeight { get; set; } = 0.5f;
         public float BaselineWeight { get; set; } = 0.25f;
 
+        /// <summary>
+        /// How readily this combatant slips out of an attack's line instead of meeting it. Only bites on
+        /// creatures whose defence mode actually includes avoidance, so it is inert for a swordsman.
+        /// </summary>
+        public float EvadeWeight { get; set; } = 1.1f;
+
+        /// <summary>How far a single evade carries the combatant across the attack's line.</summary>
+        public float EvadeDistance { get; set; } = 0.9f;
+
+        /// <summary>
+        /// Seconds of recovery after an evade. This is what stops avoidance from strictly dominating
+        /// parrying: a slip gets you out of the way, but it costs you the beat that follows.
+        /// </summary>
+        public float EvadeRecoverySeconds { get; set; } = 0.35f;
+
         /// <summary>Guards this enemy will transition into. null means every guard in the table.</summary>
         public GuardId[] AllowedTargetGuards { get; set; }
 
@@ -143,6 +158,6 @@ namespace Spellbreakers.Combat.Ai
         public float TotalWeight =>
             Math.Abs(MeasureFitWeight) + Math.Abs(GuardMatchupWeight) + Math.Abs(OpeningReadWeight) +
             Math.Abs(InitiativeWeight) + Math.Abs(CommitRiskWeight) + Math.Abs(SpacingWeight) +
-            Math.Abs(PredictabilityWeight) + Math.Abs(BaselineWeight);
+            Math.Abs(PredictabilityWeight) + Math.Abs(BaselineWeight) + Math.Abs(EvadeWeight);
     }
 }
