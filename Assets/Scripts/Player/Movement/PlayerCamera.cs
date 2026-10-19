@@ -1,13 +1,18 @@
 using System;
+using Unity.Cinemachine;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.InputSystem;
+
+
 
 namespace Player
 {
     public class PlayerCamera : MonoBehaviour
     {
         [SerializeField] private Camera _camera;
-
+        [SerializeField] private CinemachineCamera _freeLookCamera;
+        private CinemachineOrbitalFollow _orbitalFollow;
         /// <summary>The transform whose forward/right define movement space, or null if unassigned.</summary>
         public Transform CameraTransform => _camera != null ? _camera.transform : null;
 
@@ -17,6 +22,15 @@ namespace Player
         private void Awake()
         {
             if (!_camera) _camera = Camera.main;
+
+            //NOTE: did an experiment that didn't work. Keeping this here if I do want to reference the CineCam
+            // at some other point.
+            
+            // if (!_freeLookCamera)
+            //     _freeLookCamera = gameObject.GetComponent<CinemachineCamera>();
+            //
+            // var Orbit = _freeLookCamera.gameObject.GetComponent<CinemachineOrbitalFollow>();
+            // Orbit.HorizontalAxis.Recentering.Enabled = true;
         }
 
         public void OnLook(InputAction.CallbackContext ctx)
@@ -42,5 +56,7 @@ namespace Player
             // Clamp magnitude and normalise to avoid faster diagonal movement
             return Vector3.ClampMagnitude(worldDirection, 1f).normalized;
         }
+        
+
     }
 }
