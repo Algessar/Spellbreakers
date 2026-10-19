@@ -29,7 +29,8 @@ This is the primary damage window.
 
 The blade should have meaningful velocity and a clear trajectory.
 
-The attack may pass through an authored guard/pass pose at maximum extension.
+~~The attack may pass through an authored guard/pass pose at maximum extension.~~
+The attack will pass through a Transition Pose, but may also pass through Correction Poses.
 
 ---
 

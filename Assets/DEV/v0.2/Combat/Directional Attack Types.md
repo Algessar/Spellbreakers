@@ -1,5 +1,7 @@
 [under review]
 
+Question: has left/right directionality been added?
+
 # 11. Directional Attack Types
 
 The primary attack lines currently include:

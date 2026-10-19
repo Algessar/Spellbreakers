@@ -1,12 +1,19 @@
+[under revision]
+
 # 4. Guard Sides
 
-Currently only the **right-side** versions of the guards are being authored.
+The mirrored pose of each guard influence direction of attack.
 
-For the right-side guards:
+Right side VomTag -> Alber cuts diagonally from right to left
+Left side VomTag -> Alber cuts diagonally from left to right
+Right side Alber -> IronGate cuts horizontally left to right
+Left side Alber -> IronGate cuts horizontally right to left
 
-> **The left foot is the leading foot.**
+[Mostly relevant mostly for Animation purposes, but also as clarification]
+As we can see with Alber, even though the sword is *on the left side*, the Guard itself counts
+as right-sided since the left foot is forward. (If the right foot places in front while keeping Alber, it turns into IronGate!)
 
-Left/right variants are dependent on leading foot.
+Currently only right side Guards exist, but the left side equivalents are on the TODO list.
 
-Mirroring is technically possible but should not be assumed to be visually correct. The differences between left- and
-right-sided guards can be substantial enough that separate authored poses may be preferable.
+___
+

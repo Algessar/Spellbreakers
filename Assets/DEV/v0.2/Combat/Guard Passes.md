@@ -4,7 +4,7 @@
 
 The combat motion may pass through Langort without necessarily ending there.
 
-Examples:
+Examples (basic/simplified):
 
 ```
 Vom Tag
@@ -31,7 +31,7 @@ FromGuard
    ↓
 CorrectionPose
    ↓
-TransitionPose/Guard (pose might be a better term, since Langort is not a static Guard in that sense.)
+TransitionPose
    ↓
 CorrectionPose
    ↓
