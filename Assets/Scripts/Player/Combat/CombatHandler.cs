@@ -1,26 +1,70 @@
 using System;
-using System.Collections;
+using System.Collections.Generic;
 using Player;
+using Spellbreakers.Combat;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+/// <summary>
+/// Drives one character's sword fighting: it owns a <see cref="FencingAgent"/> - the shared, engine-free
+/// combat state machine - and realises that state on the Animator.
+///
+/// The division matters and follows the design doc: the agent decides *when* the blade is live, when a
+/// guard can parry, and how long a transition takes. This component only shows the result. The previous
+/// implementation had it the other way round, reading the Animator's normalised time to decide when a
+/// strike existed, which made combat timing depend on animation assets and impossible to test.
+///
+/// The same component works for the player and for enemies: only the source of intent differs.
+/// </summary>
 [DisallowMultipleComponent]
 public sealed class CombatHandler : MonoBehaviour
 {
+    [Tooltip("Seconds used to fade the pass layer in and out.")]
     public float BlendDuration = 0.12f;
-    [SerializeField] private string _initialGuard = "VomTag";
-    [SerializeField, Min(0.5f)] private float _passTimeoutSeconds = 5f;
+
+    [SerializeField] private GuardId _initialGuard = GuardId.VomTag;
+
+    [Tooltip("Distance to the current opponent, supplied by targeting or perception. Used only by " +
+             "transitions that opt into the measure gate.")]
+    [SerializeField] private float _opponentDistance = float.PositiveInfinity;
+
+    [Tooltip("Optional per-creature combat identity: how this body defends, how heavy it is, whether it " +
+             "can evade. Left empty, the combatant can both parry and avoid, as before.")]
+    [SerializeField] private CombatProfileAsset _combatProfile;
+
+    private readonly Dictionary<string, int> _passStateHashes = new Dictionary<string, int>();
 
     private Animator _animator;
-    private CombatGraph _combatGraph;
-    private Coroutine _transitionRoutine;
-    private string _queuedGuard;
-    private int _guardsLayer;
-    private int _passesLayer;
+    private int _guardsLayer = -1;
+    private int _passesLayer = -1;
+    private float _passWeight;
+    private GuardId _renderedGuard = GuardId.None;
     private bool _initialized;
 
+    /// <summary>The shared combat state machine. AI, hit detection and debug tooling all read this.</summary>
+    public FencingAgent Agent { get; private set; }
+
+    public PassPhase Phase => Agent?.Phase ?? PassPhase.None;
+
+    public GuardId CurrentGuard => Agent?.Current ?? GuardId.None;
+
+    public bool IsTransitioning => Agent != null && Agent.IsTransitioning;
+
+    /// <summary>Initiative. An enemy brain raises this when it owns the tempo.</summary>
+    public bool Vor
+    {
+        get => Agent != null && Agent.Vor;
+        set
+        {
+            if (Agent != null)
+                Agent.Vor = value;
+        }
+    }
+
     public event Action<PassPhase> PhaseChanged;
-    public PassPhase Phase { get; private set; }
+
+    /// <summary>Raised when a blade contact involving this character resolved.</summary>
+    public event Action<CombatContact> ContactResolved;
 
     private void Awake()
     {
@@ -32,161 +76,249 @@ public sealed class CombatHandler : MonoBehaviour
             return;
         }
 
-        TargetingSystem.GetOrAddForAnimator(_animator);
-    }
+        // Targeting is a player concern and is owned by InputHandler, which adds it only where input
+        // exists. Creating it here as well used to put a player-only system onto enemies, and made the
+        // "which object owns TargetingSystem" question ambiguous.
+        Agent = new FencingAgent(CombatRules.CreateTransitionsForCombatant(), _initialGuard);
+        Agent.PhaseChanged += OnPhaseChanged;
 
-    private void Start()
-    {
-        StartCoroutine(InitializeAfterControllerAssignment());
-    }
+        // Defence mode belongs to the body, and contact resolution reads it at the moment of the hit -
+        // long after any decision - so it has to live on the agent rather than be recomputed later.
+        if (_combatProfile != null)
+            _combatProfile.ApplyTo(this);
 
-    private IEnumerator InitializeAfterControllerAssignment()
-    {
-        // Preserve the previous one-frame delay for any runtime Animator controller assignment.
-        yield return null;
         _guardsLayer = _animator.GetLayerIndex("Guards");
         _passesLayer = _animator.GetLayerIndex("Passes");
-        if (_guardsLayer < 0 || _passesLayer < 0 ||
-            !_animator.HasState(_guardsLayer, Animator.StringToHash("Guards." + _initialGuard)) ||
-            !_animator.HasState(_passesLayer, Animator.StringToHash("Passes.Langort")))
+
+        if (_guardsLayer < 0 || _passesLayer < 0)
         {
-            Debug.LogError("CombatHandler needs Guards and Passes layers with the selected guard and Passes.Langort states.", this);
+            Debug.LogError("CombatHandler needs a 'Guards' and a 'Passes' Animator layer.", this);
             enabled = false;
-            yield break;
+            return;
         }
 
-        _combatGraph = new CombatGraph(_initialGuard);
+        if (!HasGuardState(_initialGuard))
+        {
+            Debug.LogError($"CombatHandler needs a 'Guards.{GuardIds.ToStateName(_initialGuard)}' state.", this);
+            enabled = false;
+            return;
+        }
+
+        // Start settled in the initial guard rather than waiting for a frame: nothing assigns the
+        // controller at runtime any more, so the old execution-order dance is gone.
         _animator.SetLayerWeight(_guardsLayer, 1f);
         _animator.SetLayerWeight(_passesLayer, 0f);
-        _animator.Play("Guards." + _initialGuard, _guardsLayer, 0f);
+        _animator.Play(GuardStateHash(_initialGuard), _guardsLayer, 0f);
+        _renderedGuard = _initialGuard;
         _initialized = true;
+    }
+
+    private void OnDestroy()
+    {
+        if (Agent != null)
+            Agent.PhaseChanged -= OnPhaseChanged;
     }
 
     private void OnDisable()
     {
-        if (_transitionRoutine != null)
-        {
-            StopCoroutine(_transitionRoutine);
-            _transitionRoutine = null;
-        }
-
-        _queuedGuard = null;
-        if (_initialized && _animator != null)
-        {
-            _combatGraph?.CancelTransition();
-            var guard = _combatGraph != null ? _combatGraph.CurrentGuard : _initialGuard;
-            if (_animator.HasState(_guardsLayer, Animator.StringToHash("Guards." + guard)))
-                _animator.Play("Guards." + guard, _guardsLayer, 0f);
-            _animator.SetLayerWeight(_guardsLayer, 1f);
-            _animator.SetLayerWeight(_passesLayer, 0f);
-        }
-
-        SetPhase(PassPhase.None);
-    }
-
-    public void OnVomTag(InputAction.CallbackContext context) { if (context.started) RequestGuard("VomTag"); }
-    public void OnPflug(InputAction.CallbackContext context) { if (context.started) RequestGuard("Pflug"); }
-    public void OnAlber(InputAction.CallbackContext context) { if (context.started) RequestGuard("Alber"); }
-    public void OnOchs(InputAction.CallbackContext context) { if (context.started) RequestGuard("Ochs"); }
-    public void OnIronGate(InputAction.CallbackContext context) { if (context.started) RequestGuard("IronGate"); }
-
-    private void RequestGuard(string guard)
-    {
-        if (!_initialized || !_animator.HasState(_guardsLayer, Animator.StringToHash("Guards." + guard)))
+        if (!_initialized)
             return;
 
-        if (_combatGraph.IsTransitioning)
-        {
-            _queuedGuard = guard;
-            return;
-        }
-
-        if (_combatGraph.TryBeginTransition(guard, out var transition))
-            _transitionRoutine = StartCoroutine(PlayTransition(transition));
-    }
-
-    private IEnumerator PlayTransition(GuardTransition transition)
-    {
-        SetPhase(PassPhase.ToPass);
-        _animator.Play("Passes.Langort", _passesLayer, 0f);
-        yield return BlendPassLayer(1f);
-
-        SetPhase(PassPhase.Strike);
-        var startTime = Time.time;
-        while (_animator.GetCurrentAnimatorStateInfo(_passesLayer).shortNameHash != Animator.StringToHash("Langort"))
-        {
-            if (Time.time - startTime > _passTimeoutSeconds)
-            {
-                AbortTransition(transition, "Passes.Langort did not become the active state.");
-                yield break;
-            }
-            yield return null;
-        }
-
-        while (_animator.GetCurrentAnimatorStateInfo(_passesLayer).normalizedTime < 1f)
-        {
-            if (Time.time - startTime > _passTimeoutSeconds)
-            {
-                AbortTransition(transition, "Passes.Langort exceeded its timeout.");
-                yield break;
-            }
-            yield return null;
-        }
-
-        SetPhase(PassPhase.Settle);
-        _animator.Play("Guards." + transition.To, _guardsLayer, 0f);
-        yield return BlendPassLayer(0f);
-
-        if (!_combatGraph.CompleteTransition(transition))
-        {
-            AbortTransition(transition, "Combat graph rejected the completed transition.");
-            yield break;
-        }
-
-        SetPhase(PassPhase.None);
-        _transitionRoutine = null;
-        var queued = _queuedGuard;
-        _queuedGuard = null;
-        if (!string.IsNullOrEmpty(queued))
-            RequestGuard(queued);
-    }
-
-    private IEnumerator BlendPassLayer(float targetWeight)
-    {
-        var startWeight = _animator.GetLayerWeight(_passesLayer);
-        if (BlendDuration <= 0f)
-        {
-            _animator.SetLayerWeight(_passesLayer, targetWeight);
-            yield break;
-        }
-
-        var elapsed = 0f;
-        while (elapsed < BlendDuration)
-        {
-            elapsed += Time.deltaTime;
-            _animator.SetLayerWeight(_passesLayer, Mathf.Lerp(startWeight, targetWeight, elapsed / BlendDuration));
-            yield return null;
-        }
-        _animator.SetLayerWeight(_passesLayer, targetWeight);
-    }
-
-    private void AbortTransition(GuardTransition transition, string reason)
-    {
-        Debug.LogWarning("Guard transition was cancelled: " + reason, this);
-        _combatGraph.CancelTransition();
-        _queuedGuard = null;
+        Agent?.CancelTransition("Component disabled.");
+        _passWeight = 0f;
         _animator.SetLayerWeight(_passesLayer, 0f);
         _animator.SetLayerWeight(_guardsLayer, 1f);
-        _animator.Play("Guards." + transition.From, _guardsLayer, 0f);
-        _transitionRoutine = null;
-        SetPhase(PassPhase.None);
+
+        if (Agent != null && HasGuardState(Agent.Current))
+            _animator.Play(GuardStateHash(Agent.Current), _guardsLayer, 0f);
+
+        _renderedGuard = Agent?.Current ?? GuardId.None;
     }
 
-    private void SetPhase(PassPhase phase)
+    private void Update()
     {
-        if (Phase == phase)
+        if (!_initialized)
             return;
-        Phase = phase;
+
+        Agent.Tick(Time.deltaTime);
+        Realize();
+    }
+
+    /// <summary>Supplies the distance used by measure-gated transitions. Infinity disables the gate.</summary>
+    public void SetOpponentDistance(float distance)
+    {
+        _opponentDistance = distance;
+    }
+
+    /// <summary>
+    /// The single intent entry point, shared by player input and enemy AI. Validation lives in the
+    /// agent so both can never disagree about what is legal.
+    /// </summary>
+    public RequestResult RequestGuard(GuardId guard)
+    {
+        if (!_initialized)
+            return RequestResult.Rejected;
+
+        return Agent.RequestGuard(guard, _opponentDistance);
+    }
+
+    /// <summary>
+    /// Brings a dead character back, posed in its initial guard. Respawning owns the decision of when;
+    /// this only tells the agent to stop being dead so the rules accept input again.
+    /// </summary>
+    public void Revive()
+    {
+        if (!_initialized || Agent == null)
+            return;
+
+        Agent.Revive(_initialGuard);
+
+        // The guard pose has to be re-asserted: while dead the agent never changed Current, so the
+        // rendered guard is already correct, but the layer weights may have been left mid-transition.
+        if (HasGuardState(Agent.Current))
+        {
+            _animator.Play(GuardStateHash(Agent.Current), _guardsLayer, 0f);
+            _renderedGuard = Agent.Current;
+        }
+
+        _passWeight = 0f;
+        _animator.SetLayerWeight(_passesLayer, 0f);
+    }
+
+    /// <summary>Puts this character into a reaction state, freezing its combat clock for a moment.</summary>
+    public void ApplyReaction(ReactionState state, float seconds)
+    {
+        Agent?.SetReaction(state, seconds);
+    }
+
+    /// <summary>Called by weapon hit detection once a contact has been resolved.</summary>
+    public void ReportContact(CombatContact contact)
+    {
+        ContactResolved?.Invoke(contact);
+    }
+
+    // --- Player input bindings -------------------------------------------------
+
+    public void OnVomTag(InputAction.CallbackContext context) { if (context.started) RequestGuard(GuardId.VomTag); }
+    public void OnPflug(InputAction.CallbackContext context) { if (context.started) RequestGuard(GuardId.Pflug); }
+    public void OnAlber(InputAction.CallbackContext context) { if (context.started) RequestGuard(GuardId.Alber); }
+    public void OnOchs(InputAction.CallbackContext context) { if (context.started) RequestGuard(GuardId.Ochs); }
+    public void OnIronGate(InputAction.CallbackContext context) { if (context.started) RequestGuard(GuardId.IronGate); }
+
+    // --- Realisation -----------------------------------------------------------
+
+    /// <summary>
+    /// Shows the agent's state. While a transition runs the pass layer is scrubbed to the agent's own
+    /// progress, so the blade on screen is live exactly when the rules say it is.
+    /// </summary>
+    private void Realize()
+    {
+        if (Agent.IsTransitioning)
+        {
+            RealizeTransition();
+            return;
+        }
+
+        BlendPassWeight(0f);
+
+        if (_renderedGuard != Agent.Current && HasGuardState(Agent.Current))
+        {
+            _animator.CrossFadeInFixedTime(GuardStateHash(Agent.Current), BlendDuration, _guardsLayer);
+            _renderedGuard = Agent.Current;
+        }
+    }
+
+    private void RealizeTransition()
+    {
+        var transition = Agent.ActiveTransition;
+        var profile = transition.Profile;
+        if (profile == null)
+        {
+            BlendPassWeight(0f);
+            return;
+        }
+
+        // Remap progress to non-linear biomechanical easing curve
+        var visualProgress = profile.EvaluateVisualProgress(Agent.Progress01);
+
+        // Three-point interpolation across the transition:
+        // First half (visualProgress < 0.5): blend from origin guard up to 100% pass apex.
+        // Second half (visualProgress >= 0.5): start transitioning guards layer to destination guard,
+        // and taper off the pass layer as we settle into the destination guard.
+        float passWeightTarget;
+        if (visualProgress < 0.5f)
+        {
+            if (_renderedGuard != transition.From && HasGuardState(transition.From))
+            {
+                _animator.CrossFadeInFixedTime(GuardStateHash(transition.From), BlendDuration, _guardsLayer);
+                _renderedGuard = transition.From;
+            }
+            passWeightTarget = Mathf.Clamp01(visualProgress * 2f);
+        }
+        else
+        {
+            if (_renderedGuard != transition.To && HasGuardState(transition.To))
+            {
+                _animator.CrossFadeInFixedTime(GuardStateHash(transition.To), BlendDuration, _guardsLayer);
+                _renderedGuard = transition.To;
+            }
+            passWeightTarget = Mathf.Clamp01((1f - visualProgress) * 2f);
+        }
+
+        var passHash = PassStateHash(profile.PassStateName);
+        if (passHash != 0)
+            _animator.Play(passHash, _passesLayer, visualProgress);
+
+        BlendPassWeight(passWeightTarget);
+    }
+
+    private void BlendPassWeight(float target)
+    {
+        if (BlendDuration <= 0f)
+        {
+            _passWeight = target;
+            _animator.SetLayerWeight(_passesLayer, target);
+            return;
+        }
+
+        var step = Time.deltaTime / BlendDuration;
+        _passWeight = Mathf.MoveTowards(_passWeight, target, step);
+        _animator.SetLayerWeight(_passesLayer, _passWeight);
+    }
+
+    private void OnPhaseChanged(PassPhase phase)
+    {
         PhaseChanged?.Invoke(phase);
+    }
+
+    private bool HasGuardState(GuardId guard)
+    {
+        var stateName = GuardIds.ToStateName(guard);
+        return !string.IsNullOrEmpty(stateName) &&
+               _animator.HasState(_guardsLayer, Animator.StringToHash(stateName));
+    }
+
+    private int GuardStateHash(GuardId guard)
+    {
+        return Animator.StringToHash(GuardIds.ToStateName(guard));
+    }
+
+    private int PassStateHash(string stateName)
+    {
+        if (string.IsNullOrEmpty(stateName))
+            return 0;
+
+        if (_passStateHashes.TryGetValue(stateName, out var hash))
+            return hash;
+
+        hash = Animator.StringToHash(stateName);
+        _passStateHashes[stateName] = hash;
+        return hash;
+    }
+
+    private void OnValidate()
+    {
+        if (BlendDuration < 0f)
+            BlendDuration = 0f;
     }
 }

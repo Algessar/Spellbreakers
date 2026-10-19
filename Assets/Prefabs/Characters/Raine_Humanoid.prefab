@@ -43,6 +43,8 @@ GameObject:
   - component: {fileID: 2059422579573311782}
   - component: {fileID: 9081306276752320498}
   - component: {fileID: 1890317485254086692}
+  - component: {fileID: 2602313049396431675}
+  - component: {fileID: -6989153822461573606}
   m_Layer: 6
   m_Name: weapon_collider
   m_TagString: Untagged
@@ -126,8 +128,29 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WeaponDamage
   _damage: 10
-  _repeatHitDelay: 0.35
-  _combatHandler: {fileID: 8531167144695209458}
+  _parriedStaggerSeconds: 0.35
+  _bindSeconds: 0.2
+  _contactLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  _owner: {fileID: 8531167144695209458}
+  _blade: {fileID: 2602313049396431675}
+  _logContacts: 0
+--- !u!114 &2602313049396431675
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7689061180214503600}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e979489cb60b1cd4b8b4b5e49fbb11b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Spellbreakers.Gameplay::Spellbreakers.Combat.Blade
+  _base: {fileID: 4935791978808886399}
+  _tip: {fileID: 1340019398951429535}
+  _radius: 0.06
 --- !u!1 &8339017439901294013
 GameObject:
   m_ObjectHideFlags: 0
@@ -1313,6 +1336,21 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 4781de2af0999d94c94c8e5086d4a934, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2180006609807874881}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 4781de2af0999d94c94c8e5086d4a934, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4619679815000510225}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 4781de2af0999d94c94c8e5086d4a934, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7292472729885777338}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 4781de2af0999d94c94c8e5086d4a934, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3774051848236713509}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 4781de2af0999d94c94c8e5086d4a934, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -6640753482291081734}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 4781de2af0999d94c94c8e5086d4a934, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -3314299885170642288}
   m_SourcePrefab: {fileID: 100100000, guid: 4781de2af0999d94c94c8e5086d4a934, type: 3}
 --- !u!4 &729034917169228119 stripped
 Transform:
@@ -1398,6 +1436,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7336534db6a666e44912ccbfbb576b14, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player.Movement_V3
+  _camera: {fileID: 0}
   _moveAmount: 0
   _isMoving: 0
   _rotationSpeed: 5
@@ -1412,6 +1451,9 @@ MonoBehaviour:
   _groundLayer:
     serializedVersion: 2
     m_Bits: 9
+  _collisionMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
   _verticalVelocity: 0
   _isGrounded: 0
   _logMovementDirection: 0
@@ -1428,8 +1470,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CombatHandler
   BlendDuration: 0.14
-  _initialGuard: VomTag
-  _passTimeoutSeconds: 5
+  _initialGuard: 0
+  _opponentDistance: Infinity
 --- !u!114 &1911140543290578097
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1442,9 +1484,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7543a64047325484c9c8d4f4f8c70daf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player.TargetingSystem
-  _enemyLayers:
-    serializedVersion: 2
-    m_Bits: 256
   _acquisitionRange: 25
   _acquisitionAngle: 100
   _targetRefreshInterval: 0.25
@@ -1458,7 +1497,6 @@ MonoBehaviour:
   _weaponAimBone: {fileID: 729034917169228119}
   _weaponAimBoneName: DEF-WEAPON_MAIN
   _viewCamera: {fileID: 0}
-  TargetCurrent: {fileID: 0}
 --- !u!114 &2180006609807874881
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1473,8 +1511,110 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Player.PlayerCamera
   _camera: {fileID: 0}
   cameraDirection: {x: 0, y: 0}
+--- !u!114 &4619679815000510225
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8395194658243273007}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26d48a5261cb71041ba2582a7cc62de2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Spellbreakers.Gameplay::Damageable
+  _maxHealth: 100
+  _team: 1
+  _aimPoint: {fileID: 2944237469077181275}
+  _logDamage: 0
+--- !u!114 &7292472729885777338
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8395194658243273007}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8e227e88977178e438b467ef684a5ffa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Spellbreakers.Gameplay::Spellbreakers.Combat.FencingDebugView
+  _toggleKey: 94
+  _showAllCombatants: 1
+  _showDecisionBreakdown: 1
 --- !u!4 &9208288538966670229 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 4781de2af0999d94c94c8e5086d4a934, type: 3}
   m_PrefabInstance: {fileID: 8665155335043275902}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &-6989153822461573606
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7689061180214503600}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc3fd38d5dbb84b43b40a712a9857012, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Spellbreakers.Gameplay::Spellbreakers.Combat.BladeTrailEffect
+  _trailMaterial: {fileID: 2100000, guid: 89dc47249a644134d9aae3131ae40a33, type: 2}
+  _trailTime: 0.12
+  _trailWidth: 0.08
+  _combatHandler: {fileID: 8531167144695209458}
+  _blade: {fileID: 2602313049396431675}
+--- !u!114 &3774051848236713509
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8395194658243273007}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec37e015c97d8a24e9de442ea222c6ee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Spellbreakers.Gameplay::Player.ProceduralSwordMotion
+  _oberhauPitch: 12
+  _mittelhauYaw: 18
+  _unterhauPitch: 8
+  _dampingSpeed: 12
+  _combatHandler: {fileID: 8531167144695209458}
+  _animator: {fileID: 0}
+--- !u!114 &-6640753482291081734
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8395194658243273007}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c89fb27c97664d519bf17e50abb45139, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Spellbreakers.Gameplay::Spellbreakers.Combat.RespawnOnDeath
+  _respawnDelay: 2.5
+  _respawnPoint: {fileID: 0}
+--- !u!114 &-3314299885170642288
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8395194658243273007}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f357d5da41cc367449a26b1f500651aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Spellbreakers.Gameplay::Spellbreakers.Combat.CombatVisualizer
+  _visible: 1
+  _showTargetMarker: 1
+  _showMeasureRings: 1
+  _showTargetingRange: 1
+  _showCombatantLabels: 1
+  _showCombatText: 1
+  _markerHeight: 2.15
+  _markerRadius: 0.1
+  _markerGroundRingRadius: 0.55
+  _ringWidth: 0.02

@@ -1,216 +1,388 @@
 using System.Collections.Generic;
-using Player;
+using Spellbreakers.Combat;
 using UnityEngine;
 
-/// <summary>Turns contacts from a weapon collider into damage on Damageable targets.</summary>
+/// <summary>
+/// Turns the blade's motion into combat results.
+///
+/// The blade is tested as a swept volume between its previous and current position on every frame, so a
+/// fast pass cannot tunnel through a target between physics steps - the previous contact-based version
+/// could miss entirely, which is what the repeat-hit delay was papering over. Each target can only be
+/// affected once per strike, which removes that delay hack as well.
+///
+/// The important behaviour is that contact is resolved through <see cref="ParryResolver"/> rather than
+/// applied as damage. Two blades meeting is a real outcome with a real consequence, and the outcome is
+/// decided by which guard or transition each fighter is in and by whether the defender timed it.
+/// </summary>
 [DisallowMultipleComponent]
 public sealed class WeaponDamage : MonoBehaviour
 {
     [SerializeField, Min(0f)] private float _damage = 10f;
-    [Tooltip("Minimum seconds between two damaging hits on the same target.")]
-    [SerializeField, Min(0.01f)] private float _repeatHitDelay = 0.35f;
 
-    [Tooltip("Layers searched by the strike-window blade sweep. Defaults to the Enemy layer (8).")]
-    [SerializeField] private LayerMask _targetLayers;
+    [Tooltip("Blade speed treated as a full-force strike by the deflection model. Faster hits are harder " +
+             "to turn aside; slower ones easier.")]
+    [SerializeField, Min(0.1f)] private float _referenceBladeSpeed = 8f;
 
-    /// <summary>Seconds between sweeps that drop entries for targets that no longer exist.</summary>
-    private const float PruneIntervalSeconds = 10f;
+    [Tooltip("Seconds the attacker is left staggered after its attack is parried or deflected.")]
+    [SerializeField, Min(0f)] private float _parriedStaggerSeconds = 0.35f;
 
-    /// <summary>Enemy layer index, used when <see cref="_targetLayers"/> is left unset.</summary>
-    private const int DefaultTargetLayer = 8;
+    [Tooltip("Seconds both fighters are stalled for when two blades bind.")]
+    [SerializeField, Min(0f)] private float _bindSeconds = 0.2f;
 
-    private readonly Dictionary<Damageable, float> _lastHitTimes = new Dictionary<Damageable, float>();
-    private readonly List<Damageable> _pruneBuffer = new List<Damageable>();
-    private readonly Collider[] _overlapBuffer = new Collider[16];
+    [Tooltip("Layers the swept test looks at. Defaults to everything.")]
+    [SerializeField] private LayerMask _contactLayers = ~0;
 
-    [Tooltip("Leave empty to find the CombatHandler on a parent at runtime.")]
-    [SerializeField] private CombatHandler _combatHandler;
-    private Collider _bladeCollider;
-    private Transform _ownerRoot;
-    private int _resolvedTargetMask;
-    private float _nextPruneTime;
+    [Tooltip("Left empty to find the CombatHandler on this character at runtime.")]
+    [SerializeField] private CombatHandler _owner;
+
+    [Tooltip("Left empty to find a Blade on this object or a parent.")]
+    [SerializeField] private Blade _blade;
+
+    /// <summary>Temporary: logs every resolved contact and why it resolved that way.</summary>
+    [SerializeField] private bool _logContacts;
+
+    private readonly RaycastHit[] _hits = new RaycastHit[16];
+    private readonly Collider[] _overlaps = new Collider[16];
+    private readonly HashSet<Damageable> _affectedThisStrike = new HashSet<Damageable>();
+    private readonly Dictionary<Damageable, CombatHandler> _handlerCache = new Dictionary<Damageable, CombatHandler>();
+
+    private Vector3 _previousBase;
+    private Vector3 _previousTip;
+    private bool _hasPreviousSample;
+    private bool _armed;
+
+    /// <summary>Blade direction and speed at the last sweep, read by the deflection model.</summary>
+    private Vector3 _lastTravelDirection;
+    private float _lastBladeSpeed;
+
+    /// <summary>Last deflection result, kept for diagnostics and the debug view.</summary>
+    private DeflectionResult _lastDeflection;
+    private Damageable _selfTarget;
+    private CombatTeam _selfTeam = CombatTeam.Neutral;
+
+    /// <summary>
+    /// Whether the owner declared a side by carrying a <see cref="Damageable"/>. A character without one
+    /// must not be silently made unable to hit anything: with no declared team every hostile check would
+    /// fail closed, so the check is skipped instead and the weapon behaves as it did before teams existed.
+    /// </summary>
+    private bool _hasTeam;
 
     private void Awake()
     {
-        // Resolve the owning combat handler. GetComponentInParent does not reliably cross a model
-        // sub-hierarchy boundary - the blade lives under the FBX bones while the handler sits on the
-        // avatar root - so search the root's subtree first, which is the path that actually works.
-        if (_combatHandler == null)
-            _combatHandler = transform.root.GetComponentInChildren<CombatHandler>(true);
+        if (_owner == null)
+            _owner = transform.root.GetComponentInChildren<CombatHandler>(true);
 
-        if (_combatHandler == null)
-            _combatHandler = GetComponentInParent<CombatHandler>();
+        if (_blade == null)
+            _blade = GetComponentInParent<Blade>() ?? transform.root.GetComponentInChildren<Blade>(true);
 
-        if (_combatHandler == null)
+        if (_blade != null && !_blade.IsValid)
+            _blade.ResolveReferences();
+
+        if (_owner != null)
         {
-            var handlers = FindObjectsByType<CombatHandler>(FindObjectsInactive.Exclude);
-            if (handlers.Length > 0)
-                _combatHandler = handlers[0];
+            _selfTarget = _owner.GetComponentInChildren<Damageable>(true) ??
+                          _owner.transform.root.GetComponentInChildren<Damageable>(true);
+
+            if (_selfTarget != null)
+            {
+                _selfTeam = _selfTarget.Team;
+                _hasTeam = true;
+            }
         }
 
-        _ownerRoot = _combatHandler != null ? _combatHandler.transform : transform.root;
-        _bladeCollider = GetComponent<Collider>();
-        _resolvedTargetMask = _targetLayers.value != 0 ? _targetLayers.value : 1 << DefaultTargetLayer;
+        if (_owner != null && !_hasTeam)
+        {
+            Debug.LogWarning($"{name}: '{transform.root.name}' has a CombatHandler but no Damageable, so it " +
+                             "has no declared side. This blade will damage anything that is not its own " +
+                             "character, and nothing will be able to target that character in return.", this);
+        }
 
-        if (_logHits && _combatHandler != null)
-            Debug.Log($"[Weapon] {name} gated by CombatHandler on '{_combatHandler.name}'", this);
-
-        DamagePopup.VerboseLogging = _logHits;
-
-        if (_combatHandler == null)
-            Debug.LogWarning($"{name}: no CombatHandler found, so this weapon damages on any contact. " +
+        if (_owner == null)
+        {
+            Debug.LogWarning($"{name}: no CombatHandler found, so this blade can never be live. " +
                              $"Root is '{transform.root.name}'.", this);
+        }
 
-        if (_bladeCollider == null)
-            Debug.LogWarning($"{name}: WeaponDamage needs a Collider on the same GameObject (the Event and Stay " +
-                             "callbacks only fire there); the strike-window sweep will still run.", this);
+        if (_blade == null || !_blade.IsValid)
+        {
+            Debug.LogWarning($"{name}: no usable Blade found, so the swept hit test cannot run.", this);
+        }
     }
 
-    private void OnCollisionEnter(Collision collision)
+    private void OnEnable()
     {
-        TryDamage(collision.collider, "collision-enter");
+        if (_owner != null)
+            _owner.PhaseChanged += OnPhaseChanged;
     }
 
-    private void OnTriggerEnter(Collider other)
+    private void OnDisable()
     {
-        TryDamage(other, "trigger-enter");
+        if (_owner != null)
+            _owner.PhaseChanged -= OnPhaseChanged;
+
+        _armed = false;
+        _hasPreviousSample = false;
     }
 
-    // Stay matters as much as Enter: a blade resting against a target, or a slow pass, would otherwise
-    // only ever get the single Enter callback and feel unresponsive.
-    private void OnTriggerStay(Collider other)
+    private void OnPhaseChanged(PassPhase phase)
     {
-        TryDamage(other, "trigger-stay");
-    }
+        _armed = phase == PassPhase.Strike;
 
-    private void OnCollisionStay(Collision collision)
-    {
-        TryDamage(collision.collider, "collision-stay");
+        if (!_armed)
+        {
+            _hasPreviousSample = false;
+            return;
+        }
+
+        _affectedThisStrike.Clear();
+        Sample();
+        _hasPreviousSample = true;
     }
 
     /// <summary>
-    /// Physics events only fire on the exact frame contact begins, so a fast swing or a blade that is
-    /// already touching the target when the strike opens can be missed entirely. While the strike phase
-    /// is open this sweeps the blade's actual volume, which is what makes hits feel responsive.
+    /// Runs after the Animator has posed the blade, so the sampled positions are the ones that were
+    /// actually rendered - not the previous frame's.
     /// </summary>
-    private void Update()
+    private void LateUpdate()
     {
-        if (!IsStrikeActive || _bladeCollider == null)
+        if (!_armed || _blade == null || !_blade.IsValid)
             return;
 
-        var bladeTransform = _bladeCollider.transform;
-        var count = Physics.OverlapBoxNonAlloc(
-            bladeTransform.TransformPoint(GetBladeLocalCenter()),
-            GetBladeHalfExtents(),
-            _overlapBuffer,
-            bladeTransform.rotation,
-            _resolvedTargetMask,
+        var currentBase = _blade.BasePosition;
+        var currentTip = _blade.TipPosition;
+
+        if (!_hasPreviousSample)
+        {
+            _previousBase = currentBase;
+            _previousTip = currentTip;
+            _hasPreviousSample = true;
+            return;
+        }
+
+        SweepBetween(_previousBase, _previousTip, currentBase, currentTip);
+
+        _previousBase = currentBase;
+        _previousTip = currentTip;
+    }
+
+    private void Sample()
+    {
+        _previousBase = _blade.BasePosition;
+        _previousTip = _blade.TipPosition;
+    }
+
+    private void SweepBetween(Vector3 previousBase, Vector3 previousTip, Vector3 currentBase, Vector3 currentTip)
+    {
+        var radius = _blade.Radius;
+        var travel = ((currentBase + currentTip) - (previousBase + previousTip)) * 0.5f;
+        var distance = travel.magnitude;
+
+        // The deflection model needs the blade's direction and speed at the instant of contact, so the
+        // sweep records them for ResolveContact rather than each contact re-deriving them.
+        if (distance > 0.0001f)
+        {
+            _lastTravelDirection = travel / distance;
+            _lastBladeSpeed = distance / Mathf.Max(0.0001f, Time.deltaTime);
+        }
+        else
+        {
+            _lastBladeSpeed = 0f;
+        }
+
+        if (distance > 0.0001f)
+        {
+            var count = Physics.CapsuleCastNonAlloc(
+                previousBase,
+                previousTip,
+                radius,
+                travel / distance,
+                _hits,
+                distance,
+                _contactLayers,
+                QueryTriggerInteraction.Collide);
+
+            for (var i = 0; i < count; i++)
+                ResolveContact(_hits[i].collider);
+        }
+
+        var overlapCount = Physics.OverlapCapsuleNonAlloc(
+            currentBase,
+            currentTip,
+            radius,
+            _overlaps,
+            _contactLayers,
             QueryTriggerInteraction.Collide);
 
-        for (var i = 0; i < count; i++)
-            TryDamage(_overlapBuffer[i], "sweep");
+        for (var i = 0; i < overlapCount; i++)
+            ResolveContact(_overlaps[i]);
     }
 
-    /// <summary>Temporary: logs which detection path produced each hit, and why others were ignored.</summary>
-    [SerializeField] private bool _logHits;
-
-    /// <summary>Also damage during the settle (follow-through) phase, after the pass animation completes.</summary>
-    [Tooltip("Count the settle/follow-through phase as part of the strike window.")]
-    [SerializeField] private bool _damageDuringSettle = true;
-
-    /// <summary>
-    /// A weapon belonging to a CombatHandler only damages during the strike phase, so brushing the blade
-    /// against a target while idle, walking, or settling no longer registers a hit. A weapon with no
-    /// CombatHandler keeps its unconditional behaviour.
-    /// </summary>
-    private bool IsStrikeActive
-    {
-        get
-        {
-            if (_combatHandler == null)
-                return true;
-
-            var phase = _combatHandler.Phase;
-            return phase == PassPhase.Strike || (_damageDuringSettle && phase == PassPhase.Settle);
-        }
-    }
-
-    private void TryDamage(Collider other, string source)
+    private void ResolveContact(Collider other)
     {
         if (other == null)
             return;
 
-        if (!IsStrikeActive)
-        {
-            // The blade is touching something, but the combat phase is not open.
-            if (_logHits && other.GetComponentInParent<Damageable>() != null)
-                Debug.Log($"[Weapon] contact via {source} ignored - phase is " +
-                          $"{(_combatHandler == null ? "None (no CombatHandler)" : _combatHandler.Phase.ToString())}", this);
-            return;
-        }
-
         var target = other.GetComponentInParent<Damageable>();
-        if (target == null || target.IsDead)
+        if (target == null || target == _selfTarget || !target.IsAlive)
             return;
 
-        // Never let a character damage itself through its own weapon.
-        var targetTransform = target.transform;
-        if (targetTransform == _ownerRoot || targetTransform.IsChildOf(_ownerRoot))
+        if (_hasTeam && !CombatTeams.AreHostile(_selfTeam, target.Team))
             return;
 
-        if (Time.time >= _nextPruneTime)
-            PruneStaleEntries();
+        if (!_affectedThisStrike.Add(target))
+            return;
 
-        if (_lastHitTimes.TryGetValue(target, out var lastHitTime) &&
-            Time.time - lastHitTime < _repeatHitDelay)
+        var hitBlade = other.GetComponentInParent<Blade>();
+        var defenderHandler = ResolveHandler(target);
+
+        // How square the strike arrived: 1 means the blade travelled straight at the defender, 0 means it
+        // was already moving across or away from them. This is the "contact angle" of the deflection model.
+        var toDefender = target.AimPosition - _blade.TipPosition;
+        var contactAngle = toDefender.sqrMagnitude > 0.0001f && _lastTravelDirection.sqrMagnitude > 0.0001f
+            ? Mathf.Clamp01(Vector3.Dot(_lastTravelDirection, toDefender.normalized))
+            : 0f;
+
+        var outcome = ResolveOutcome(hitBlade, defenderHandler, contactAngle);
+
+        Apply(outcome, target, defenderHandler);
+    }
+
+    /// <summary>
+    /// Turns a contact into an outcome.
+    ///
+    /// The parry table is consulted for its *disposition* - this guard answers this line well or badly -
+    /// but it no longer decides the result. The design doc asks for deflection to be a gradient driven
+    /// by the physical relationship between the attack and the defender, so timing quality, contact
+    /// angle and the attacking blade's speed decide where on that gradient the contact actually lands,
+    /// and a creature that cannot parry never reaches the gradient at all.
+    /// </summary>
+    private CombatOutcome ResolveOutcome(Blade hitBlade, CombatHandler defenderHandler, float contactAngle)
+    {
+        // A blade with no live character behind it is just an obstacle: it cannot parry.
+        if (hitBlade == null || defenderHandler == null || _owner?.Agent == null)
+            return CombatOutcome.HitBody;
+
+        var attacker = _owner.Agent;
+        if (!attacker.ActiveTransition.IsValid)
+            return CombatOutcome.HitBody;
+
+        var defender = defenderHandler.Agent;
+
+        var baseline = ParryResolver.Resolve(
+            attacker.ActiveTransition,
+            defender.Current,
+            defender.ActiveTransition,
+            defender.IsInParryWindow,
+            CombatRules.Parry,
+            attacker.Progress01);
+
+        if (baseline.Outcome == CombatOutcome.Undefined)
         {
-            if (_logHits)
-                Debug.Log($"[Weapon] contact via {source} on {target.name} suppressed by repeat delay " +
-                          $"({Time.time - lastHitTime:F3}s < {_repeatHitDelay:F2}s)", this);
-            return;
+            // A hole in the parry table. Fail loudly but do not silently invent a rule.
+            Debug.LogWarning($"[Weapon] Parry table has no entry for {attacker.ActiveTransition.Direction} " +
+                             $"against {defender.Current}; treating it as an unfavourable prior.", this);
         }
 
-        if (_logHits)
-            Debug.Log($"[Weapon] HIT {target.name} via {source} for {_damage:F0}", this);
+        var input = new DeflectionInput(
+            TimingQuality(defender),
+            contactAngle,
+            _lastBladeSpeed,
+            _referenceBladeSpeed,
+            baseline.Outcome);
 
-        _lastHitTimes[target] = Time.time;
-        target.ApplyDamage(_damage);
-    }
+        var result = DeflectionResolver.Resolve(input, defender.DefenceMode);
+        _lastDeflection = result;
 
-    /// <summary>Blade centre in the collider's local space (OverlapBox takes local units).</summary>
-    private Vector3 GetBladeLocalCenter()
-    {
-        return _bladeCollider is BoxCollider box ? box.center : Vector3.zero;
-    }
-
-    /// <summary>Blade half-size in the collider's local space.</summary>
-    private Vector3 GetBladeHalfExtents()
-    {
-        if (_bladeCollider is BoxCollider box)
-            return box.size * 0.5f;
-
-        // Non-box colliders fall back to their world bounds, converted into the collider's local frame.
-        var extents = _bladeCollider.bounds.extents;
-        var scale = _bladeCollider.transform.lossyScale;
-        return new Vector3(
-            scale.x != 0f ? extents.x / Mathf.Abs(scale.x) : extents.x,
-            scale.y != 0f ? extents.y / Mathf.Abs(scale.y) : extents.y,
-            scale.z != 0f ? extents.z / Mathf.Abs(scale.z) : extents.z);
-    }
-
-    /// <summary>Drops entries for destroyed targets, so long sessions do not accumulate stale references.</summary>
-    private void PruneStaleEntries()
-    {
-        _nextPruneTime = Time.time + PruneIntervalSeconds;
-
-        _pruneBuffer.Clear();
-        foreach (var entry in _lastHitTimes)
+        if (_logContacts)
         {
-            if (entry.Key == null && Time.time - entry.Value >= _repeatHitDelay)
-                _pruneBuffer.Add(entry.Key);
+            Debug.Log($"[Weapon] {name} vs {defenderHandler.CurrentGuard} ({defender.DefenceMode}): " +
+                      $"timing {input.TimingQuality:0.00} angle {contactAngle:0.00} " +
+                      $"speed {_lastBladeSpeed:0.0}/{_referenceBladeSpeed:0.0} -> {result}", this);
         }
 
-        foreach (var target in _pruneBuffer)
-            _lastHitTimes.Remove(target);
+        return result.Outcome;
+    }
+
+    /// <summary>
+    /// How well the defender timed its answer. Mid-window is best; a defence that barely catches the
+    /// edge of the window reads as worse. Holding a guard decays as the arrival grace runs out, which is
+    /// what stops "stand still and be safe" from working.
+    /// </summary>
+    private static float TimingQuality(FencingAgent defender)
+    {
+        if (defender.IsTransitioning && defender.ActiveTransition.Profile != null)
+        {
+            var profile = defender.ActiveTransition.Profile;
+            return DeflectionResolver.TimingQualityFromWindow(
+                defender.Progress01,
+                profile.ParryWindowStart,
+                profile.ParryWindowEnd);
+        }
+
+        var grace = defender.Table.GuardOr(defender.Current).ParryGraceSeconds;
+        return grace <= 0.0001f ? 0f : FencingMath.Clamp01(defender.ParryWindowRemaining / grace);
+    }
+
+    private void Apply(CombatOutcome outcome, Damageable target, CombatHandler defenderHandler)
+    {
+        var attacker = _owner != null ? _owner.Agent : null;
+        var attackerGuard = attacker != null ? attacker.Current : GuardId.None;
+        var attackerTransition = attacker != null ? attacker.ActiveTransition : default;
+        var progress = attacker != null ? attacker.Progress01 : 0f;
+
+        var contact = new CombatContact(
+            outcome,
+            attackerGuard,
+            attackerTransition,
+            defenderHandler != null ? defenderHandler.CurrentGuard : GuardId.None,
+            defenderHandler != null && defenderHandler.IsTransitioning,
+            progress);
+
+        if (_logContacts)
+            Debug.Log($"[Weapon] {name} -> {contact.Describe()}", this);
+
+        // Both sides hear about the contact, so feedback and AI reactions can respond to either role.
+        _owner?.ReportContact(contact);
+        defenderHandler?.ReportContact(contact);
+
+        switch (outcome)
+        {
+            case CombatOutcome.HitBody:
+            case CombatOutcome.Undefined:
+                target.ApplyDamage(new HitInfo(_damage, attackerGuard, attackerTransition, CombatOutcome.HitBody, progress));
+                defenderHandler?.ApplyReaction(ReactionState.Hit, 0.25f);
+                break;
+
+            case CombatOutcome.Parry:
+                // The parry is the reward: the attack is stopped and the attacker is left recovering,
+                // which is the opening the design doc asks a good defence to create.
+                _owner?.ApplyReaction(ReactionState.Staggered, _parriedStaggerSeconds);
+                defenderHandler?.Agent.RefreshParryWindow(Measure.Zufechten);
+                break;
+
+            case CombatOutcome.Deflect:
+                _owner?.ApplyReaction(ReactionState.Staggered, _parriedStaggerSeconds * 1.5f);
+                defenderHandler?.Agent.RefreshParryWindow(Measure.Zufechten);
+                break;
+
+            case CombatOutcome.Bind:
+                // Neither blade gives ground: both fighters stall on the bind.
+                _owner?.ApplyReaction(ReactionState.Staggered, _bindSeconds);
+                defenderHandler?.ApplyReaction(ReactionState.Staggered, _bindSeconds);
+                break;
+        }
+    }
+
+    private CombatHandler ResolveHandler(Damageable target)
+    {
+        if (target == null)
+            return null;
+
+        if (_handlerCache.TryGetValue(target, out var cached) && cached != null)
+            return cached;
+
+        var handler = CombatantRegistry.FindOwnerComponent<CombatHandler>(target);
+        _handlerCache[target] = handler;
+        return handler;
     }
 }
