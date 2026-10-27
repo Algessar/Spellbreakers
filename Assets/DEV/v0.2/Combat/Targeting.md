@@ -29,3 +29,8 @@ Setting lower values both made combat feel better and increased targeting accura
     
 
 These are implementation bugs, not intended design behavior.
+
+### Related
+
+Target acquisition now only exists while the player is in combat; see `Combat State.md`. Pressing target
+out of combat asks to engage when a hostile is already close, and otherwise does nothing.

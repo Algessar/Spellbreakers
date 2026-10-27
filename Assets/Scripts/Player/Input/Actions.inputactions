@@ -77,6 +77,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "Spirits",
+                    "type": "Button",
+                    "id": "3f0d9a54-6f8e-4a5f-9d67-2b0f4b6f2a11",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -385,6 +394,28 @@
                     "processors": "",
                     "groups": "",
                     "action": "SwitchTarget",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "b6a1e2c7-3d4f-4e8a-9b12-5c7d8e9f0a21",
+                    "path": "<Keyboard>/p",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Spirits",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "c7b2f3d8-4e5a-4f9b-8c23-6d8e9f0a1b32",
+                    "path": "<Gamepad>/select",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Spirits",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

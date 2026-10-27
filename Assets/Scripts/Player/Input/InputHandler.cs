@@ -30,6 +30,11 @@ namespace Player
             var animator = GetComponentInChildren<Animator>(true);
             _targeting = TargetingSystem.GetOrAddForAnimator(animator);
 
+            // Created here, after targeting, so both exist before Start resolves their references. Combat
+            // being a range-driven state rather than a permanent stance is what keeps the guard inputs
+            // free outside a fight.
+            CombatEngagement.GetOrAdd(gameObject);
+
             _actions = new Actions();
 
             WarnIfMissing(_movement, nameof(Movement));

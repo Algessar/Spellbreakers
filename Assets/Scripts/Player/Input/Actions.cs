@@ -163,6 +163,15 @@ public partial class @Actions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Spirits"",
+                    ""type"": ""Button"",
+                    ""id"": ""3f0d9a54-6f8e-4a5f-9d67-2b0f4b6f2a11"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -473,6 +482,28 @@ public partial class @Actions: IInputActionCollection2, IDisposable
                     ""action"": ""SwitchTarget"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""b6a1e2c7-3d4f-4e8a-9b12-5c7d8e9f0a21"",
+                    ""path"": ""<Keyboard>/p"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Spirits"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""c7b2f3d8-4e5a-4f9b-8c23-6d8e9f0a1b32"",
+                    ""path"": ""<Gamepad>/select"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Spirits"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -489,6 +520,7 @@ public partial class @Actions: IInputActionCollection2, IDisposable
         m_Player_Ochs = m_Player.FindAction("Ochs", throwIfNotFound: true);
         m_Player_IronGate = m_Player.FindAction("IronGate", throwIfNotFound: true);
         m_Player_SwitchTarget = m_Player.FindAction("SwitchTarget", throwIfNotFound: true);
+        m_Player_Spirits = m_Player.FindAction("Spirits", throwIfNotFound: true);
     }
 
     ~@Actions()
@@ -577,6 +609,7 @@ public partial class @Actions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_Ochs;
     private readonly InputAction m_Player_IronGate;
     private readonly InputAction m_Player_SwitchTarget;
+    private readonly InputAction m_Player_Spirits;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -620,6 +653,10 @@ public partial class @Actions: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player/SwitchTarget".
         /// </summary>
         public InputAction @SwitchTarget => m_Wrapper.m_Player_SwitchTarget;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/Spirits".
+        /// </summary>
+        public InputAction @Spirits => m_Wrapper.m_Player_Spirits;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -670,6 +707,9 @@ public partial class @Actions: IInputActionCollection2, IDisposable
             @SwitchTarget.started += instance.OnSwitchTarget;
             @SwitchTarget.performed += instance.OnSwitchTarget;
             @SwitchTarget.canceled += instance.OnSwitchTarget;
+            @Spirits.started += instance.OnSpirits;
+            @Spirits.performed += instance.OnSpirits;
+            @Spirits.canceled += instance.OnSpirits;
         }
 
         /// <summary>
@@ -705,6 +745,9 @@ public partial class @Actions: IInputActionCollection2, IDisposable
             @SwitchTarget.started -= instance.OnSwitchTarget;
             @SwitchTarget.performed -= instance.OnSwitchTarget;
             @SwitchTarget.canceled -= instance.OnSwitchTarget;
+            @Spirits.started -= instance.OnSpirits;
+            @Spirits.performed -= instance.OnSpirits;
+            @Spirits.canceled -= instance.OnSpirits;
         }
 
         /// <summary>
@@ -801,5 +844,12 @@ public partial class @Actions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnSwitchTarget(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Spirits" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnSpirits(InputAction.CallbackContext context);
     }
 }

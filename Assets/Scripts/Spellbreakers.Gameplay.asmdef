@@ -3,6 +3,7 @@
     "rootNamespace": "Spellbreakers",
     "references": [
         "Spellbreakers.Core",
+        "Spellbreakers.Spirits",
         "Unity.InputSystem",
         "Unity.TextMeshPro",
         "UnityEngine.UI",

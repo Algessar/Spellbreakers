@@ -3,6 +3,7 @@
     "rootNamespace": "Spellbreakers.Tests",
     "references": [
         "Spellbreakers.Core",
+        "Spellbreakers.Spirits",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

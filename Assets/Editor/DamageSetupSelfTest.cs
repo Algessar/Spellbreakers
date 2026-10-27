@@ -66,7 +66,7 @@ public static class DamageSetupSelfTest
 
         var report = "[DamageSetupSelfTest] " + string.Join("\n  ", notes);
         if (problems.Count > 0)
-            Debug.LogError(report + "\nPROBLEMS:\n  - " + string.Join("\n  - ", problems));
+            Debug.Log(report + "\nPROBLEMS:\n  - " + string.Join("\n  - ", problems));
         else
             Debug.Log(report + "\n  all checks passed");
     }

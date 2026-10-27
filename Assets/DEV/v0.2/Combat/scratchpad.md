@@ -70,3 +70,6 @@ are hard enough should ofcourse still be usable for parrying).
 
 If something is unclear still please do ask. If we're in agreement we can proceed with implementation!
 
+
+
+

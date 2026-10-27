@@ -32,12 +32,19 @@ public sealed class CombatHandler : MonoBehaviour
              "can evade. Left empty, the combatant can both parry and avoid, as before.")]
     [SerializeField] private CombatProfileAsset _combatProfile;
 
+    [Tooltip("Whether this character already holds a guard on spawn. Enemies keep this; the player's " +
+             "CombatEngagement turns it off until a hostile comes into range, so exploration uses the " +
+             "ordinary locomotion states instead of a permanently raised sword.")]
+    [SerializeField] private bool _startsInCombat = true;
+
     private readonly Dictionary<string, int> _passStateHashes = new Dictionary<string, int>();
 
     private Animator _animator;
     private int _guardsLayer = -1;
     private int _passesLayer = -1;
     private float _passWeight;
+    private float _guardWeight = 1f;
+    private float _guardWeightTarget = 1f;
     private GuardId _renderedGuard = GuardId.None;
     private bool _initialized;
 
@@ -49,6 +56,13 @@ public sealed class CombatHandler : MonoBehaviour
     public GuardId CurrentGuard => Agent?.Current ?? GuardId.None;
 
     public bool IsTransitioning => Agent != null && Agent.IsTransitioning;
+
+    /// <summary>
+    /// Whether this character is fighting at all. Out of combat the guards and passes layers are silent
+    /// and the base locomotion states own the whole body, which is what lets the guard buttons sit idle
+    /// during exploration instead of being consumed by a stance the player never asked for.
+    /// </summary>
+    public bool CombatActive { get; private set; }
 
     /// <summary>Initiative. An enemy brain raises this when it owns the tempo.</summary>
     public bool Vor
@@ -62,6 +76,9 @@ public sealed class CombatHandler : MonoBehaviour
     }
 
     public event Action<PassPhase> PhaseChanged;
+
+    /// <summary>Raised when the character enters or leaves combat.</summary>
+    public event Action<bool> CombatStateChanged;
 
     /// <summary>Raised when a blade contact involving this character resolved.</summary>
     public event Action<CombatContact> ContactResolved;
@@ -106,7 +123,12 @@ public sealed class CombatHandler : MonoBehaviour
 
         // Start settled in the initial guard rather than waiting for a frame: nothing assigns the
         // controller at runtime any more, so the old execution-order dance is gone.
-        _animator.SetLayerWeight(_guardsLayer, 1f);
+        // Whether that guard is actually shown is a separate question, answered by CombatActive - an
+        // enemy holds it from the first frame, the player's CombatEngagement lowers it until a hostile
+        // comes close.
+        CombatActive = _startsInCombat;
+        _guardWeight = _guardWeightTarget = CombatActive ? 1f : 0f;
+        _animator.SetLayerWeight(_guardsLayer, _guardWeight);
         _animator.SetLayerWeight(_passesLayer, 0f);
         _animator.Play(GuardStateHash(_initialGuard), _guardsLayer, 0f);
         _renderedGuard = _initialGuard;
@@ -127,7 +149,7 @@ public sealed class CombatHandler : MonoBehaviour
         Agent?.CancelTransition("Component disabled.");
         _passWeight = 0f;
         _animator.SetLayerWeight(_passesLayer, 0f);
-        _animator.SetLayerWeight(_guardsLayer, 1f);
+        _animator.SetLayerWeight(_guardsLayer, _guardWeightTarget);
 
         if (Agent != null && HasGuardState(Agent.Current))
             _animator.Play(GuardStateHash(Agent.Current), _guardsLayer, 0f);
@@ -142,6 +164,65 @@ public sealed class CombatHandler : MonoBehaviour
 
         Agent.Tick(Time.deltaTime);
         Realize();
+        BlendGuardWeight();
+    }
+
+    /// <summary>
+    /// Turns combat on or off. Entering is instant when asked to be, because the alternative is the
+    /// player watching their guard fade in during the first frames of a fight; leaving is a blend, so
+    /// the sword is lowered rather than snapped away.
+    /// </summary>
+    public void SetCombatActive(bool active, bool instant = false)
+    {
+        if (!_initialized)
+        {
+            // Called before Awake finished wiring the Animator. Record the intent and let Awake honour it.
+            _startsInCombat = active;
+            return;
+        }
+
+        if (CombatActive == active)
+        {
+            if (instant)
+            {
+                _guardWeight = _guardWeightTarget;
+                _animator.SetLayerWeight(_guardsLayer, _guardWeight);
+            }
+
+            return;
+        }
+
+        CombatActive = active;
+        _guardWeightTarget = active ? 1f : 0f;
+
+        if (!active)
+        {
+            // Walking away ends the attack in progress. Letting a pass finish after combat has ended
+            // would leave a live blade in a scene with no opponent.
+            Agent?.CancelTransition("Combat ended.");
+            _passWeight = 0f;
+            _animator.SetLayerWeight(_passesLayer, 0f);
+        }
+
+        if (instant)
+        {
+            _guardWeight = _guardWeightTarget;
+            _animator.SetLayerWeight(_guardsLayer, _guardWeight);
+        }
+
+        CombatStateChanged?.Invoke(active);
+    }
+
+    private void BlendGuardWeight()
+    {
+        if (Mathf.Approximately(_guardWeight, _guardWeightTarget))
+            return;
+
+        _guardWeight = BlendDuration <= 0f
+            ? _guardWeightTarget
+            : Mathf.MoveTowards(_guardWeight, _guardWeightTarget, Time.deltaTime / BlendDuration);
+
+        _animator.SetLayerWeight(_guardsLayer, _guardWeight);
     }
 
     /// <summary>Supplies the distance used by measure-gated transitions. Infinity disables the gate.</summary>
@@ -156,7 +237,8 @@ public sealed class CombatHandler : MonoBehaviour
     /// </summary>
     public RequestResult RequestGuard(GuardId guard)
     {
-        if (!_initialized)
+        // No combat, no guard. This is what frees the guard inputs outside a fight.
+        if (!_initialized || !CombatActive)
             return RequestResult.Rejected;
 
         return Agent.RequestGuard(guard, _opponentDistance);
@@ -175,12 +257,14 @@ public sealed class CombatHandler : MonoBehaviour
 
         // The guard pose has to be re-asserted: while dead the agent never changed Current, so the
         // rendered guard is already correct, but the layer weights may have been left mid-transition.
-        if (HasGuardState(Agent.Current))
+        if (CombatActive && HasGuardState(Agent.Current))
         {
             _animator.Play(GuardStateHash(Agent.Current), _guardsLayer, 0f);
             _renderedGuard = Agent.Current;
         }
 
+        _guardWeight = _guardWeightTarget;
+        _animator.SetLayerWeight(_guardsLayer, _guardWeight);
         _passWeight = 0f;
         _animator.SetLayerWeight(_passesLayer, 0f);
     }
@@ -213,6 +297,14 @@ public sealed class CombatHandler : MonoBehaviour
     /// </summary>
     private void Realize()
     {
+        // Out of combat the guards layer is faded out by BlendGuardWeight; re-driving guard states here
+        // would keep a sheathed sword fighting an invisible opponent.
+        if (!CombatActive)
+        {
+            BlendPassWeight(0f);
+            return;
+        }
+
         if (Agent.IsTransitioning)
         {
             RealizeTransition();

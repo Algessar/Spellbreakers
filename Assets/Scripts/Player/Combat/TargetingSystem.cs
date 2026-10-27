@@ -133,6 +133,11 @@ namespace Player
 
             _combatHandler.PhaseChanged -= HandlePassPhaseChanged;
             _combatHandler.PhaseChanged += HandlePassPhaseChanged;
+
+            // Leaving combat drops the lock. Facing a target you are no longer fighting would keep the
+            // in-guard locomotion states alive after the guard itself has been lowered.
+            _combatHandler.CombatStateChanged -= HandleCombatStateChanged;
+            _combatHandler.CombatStateChanged += HandleCombatStateChanged;
         }
 
         private void Update()
@@ -168,6 +173,7 @@ namespace Player
             if (_combatHandler != null)
             {
                 _combatHandler.PhaseChanged -= HandlePassPhaseChanged;
+                _combatHandler.CombatStateChanged -= HandleCombatStateChanged;
                 _combatHandler.SetOpponentDistance(float.PositiveInfinity);
             }
 
@@ -183,6 +189,16 @@ namespace Player
         {
             if (!context.started)
                 return;
+
+            // Outside combat there is nothing worth locking onto. Pressing target near a hostile is
+            // treated as intent to engage, which is the one deliberate way into a fight; pressing it with
+            // nobody around does nothing and leaves locomotion alone.
+            if (_combatHandler != null && !_combatHandler.CombatActive)
+            {
+                var engagement = GetComponent<CombatEngagement>() ?? GetComponentInParent<CombatEngagement>();
+                if (engagement == null || !engagement.TryEngage() || !engagement.IsInCombat)
+                    return;
+            }
 
             IsTargeting = !IsTargeting;
             if (IsTargeting)
@@ -326,6 +342,12 @@ namespace Player
         private void HandlePassPhaseChanged(PassPhase phase)
         {
             _guardPassAimActive = phase == PassPhase.Strike;
+        }
+
+        private void HandleCombatStateChanged(bool inCombat)
+        {
+            if (!inCombat)
+                StopTargeting();
         }
 
         // The Passes layer has IK Pass enabled so the pose correction is applied after its animation.

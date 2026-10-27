@@ -1,0 +1,12 @@
+fileFormatVersion: 2
+guid: a3afd4b818c970246a5fac137b53b895
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures:
+  - _GroundTex: {instanceID: 0}
+  - _RockTex: {instanceID: 0}
+  - _SnowTex: {instanceID: 0}
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
