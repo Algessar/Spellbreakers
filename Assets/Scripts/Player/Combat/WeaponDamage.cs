@@ -270,7 +270,7 @@ public sealed class WeaponDamage : MonoBehaviour
 
         var baseline = ParryResolver.Resolve(
             attacker.ActiveTransition,
-            defender.Current,
+            defender.CurrentKey,
             defender.ActiveTransition,
             defender.IsInParryWindow,
             CombatRules.Parry,

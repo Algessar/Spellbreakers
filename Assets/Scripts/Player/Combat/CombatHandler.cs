@@ -45,7 +45,7 @@ public sealed class CombatHandler : MonoBehaviour
     private float _passWeight;
     private float _guardWeight = 1f;
     private float _guardWeightTarget = 1f;
-    private GuardId _renderedGuard = GuardId.None;
+    private GuardKey _renderedGuard = GuardKey.None;
     private bool _initialized;
 
     /// <summary>The shared combat state machine. AI, hit detection and debug tooling all read this.</summary>
@@ -54,6 +54,12 @@ public sealed class CombatHandler : MonoBehaviour
     public PassPhase Phase => Agent?.Phase ?? PassPhase.None;
 
     public GuardId CurrentGuard => Agent?.Current ?? GuardId.None;
+
+    /// <summary>The guard including which side it is held on. Rendering and the parry side rule both need it.</summary>
+    public GuardKey CurrentKey => Agent?.CurrentKey ?? GuardKey.None;
+
+    /// <summary>Which side the guard is held on. Right until the mirror input is used.</summary>
+    public GuardSide CurrentSide => Agent?.CurrentSide ?? GuardSide.None;
 
     public bool IsTransitioning => Agent != null && Agent.IsTransitioning;
 
@@ -114,9 +120,10 @@ public sealed class CombatHandler : MonoBehaviour
             return;
         }
 
-        if (!HasGuardState(_initialGuard))
+        if (!HasGuardState(GuardKey.Right(_initialGuard)))
         {
-            Debug.LogError($"CombatHandler needs a 'Guards.{GuardIds.ToStateName(_initialGuard)}' state.", this);
+            Debug.LogError(
+                $"CombatHandler needs a 'Guards.{GuardIds.ToStateName(GuardKey.Right(_initialGuard))}' state.", this);
             enabled = false;
             return;
         }
@@ -130,8 +137,8 @@ public sealed class CombatHandler : MonoBehaviour
         _guardWeight = _guardWeightTarget = CombatActive ? 1f : 0f;
         _animator.SetLayerWeight(_guardsLayer, _guardWeight);
         _animator.SetLayerWeight(_passesLayer, 0f);
-        _animator.Play(GuardStateHash(_initialGuard), _guardsLayer, 0f);
-        _renderedGuard = _initialGuard;
+        _animator.Play(GuardStateHash(GuardKey.Right(_initialGuard)), _guardsLayer, 0f);
+        _renderedGuard = GuardKey.Right(_initialGuard);
         _initialized = true;
     }
 
@@ -151,10 +158,10 @@ public sealed class CombatHandler : MonoBehaviour
         _animator.SetLayerWeight(_passesLayer, 0f);
         _animator.SetLayerWeight(_guardsLayer, _guardWeightTarget);
 
-        if (Agent != null && HasGuardState(Agent.Current))
-            _animator.Play(GuardStateHash(Agent.Current), _guardsLayer, 0f);
+        if (Agent != null && HasGuardState(Agent.CurrentKey))
+            _animator.Play(GuardStateHash(Agent.CurrentKey), _guardsLayer, 0f);
 
-        _renderedGuard = Agent?.Current ?? GuardId.None;
+        _renderedGuard = Agent?.CurrentKey ?? GuardKey.None;
     }
 
     private void Update()
@@ -257,10 +264,10 @@ public sealed class CombatHandler : MonoBehaviour
 
         // The guard pose has to be re-asserted: while dead the agent never changed Current, so the
         // rendered guard is already correct, but the layer weights may have been left mid-transition.
-        if (CombatActive && HasGuardState(Agent.Current))
+        if (CombatActive && HasGuardState(Agent.CurrentKey))
         {
-            _animator.Play(GuardStateHash(Agent.Current), _guardsLayer, 0f);
-            _renderedGuard = Agent.Current;
+            _animator.Play(GuardStateHash(Agent.CurrentKey), _guardsLayer, 0f);
+            _renderedGuard = Agent.CurrentKey;
         }
 
         _guardWeight = _guardWeightTarget;
@@ -283,11 +290,33 @@ public sealed class CombatHandler : MonoBehaviour
 
     // --- Player input bindings -------------------------------------------------
 
+    /// <summary>
+    /// Clears the current guard and starts holding its mirror. This is the whole of the mirror input: it
+    /// is a guard request like any other, so it obeys the same commitment, queuing and reaction rules
+    /// rather than teleporting the pose.
+    ///
+    /// A side switch is a traversal, never an attack, so mirroring is always available - including from a
+    /// guard that has no authored left-side attack out of it.
+    /// </summary>
+    public RequestResult RequestGuardMirrored()
+    {
+        if (!_initialized || !CombatActive || Agent == null)
+            return RequestResult.Rejected;
+
+        return Agent.RequestGuard(Agent.Current, GuardIds.Opposite(Agent.CurrentSide), _opponentDistance);
+    }
+
     public void OnVomTag(InputAction.CallbackContext context) { if (context.started) RequestGuard(GuardId.VomTag); }
     public void OnPflug(InputAction.CallbackContext context) { if (context.started) RequestGuard(GuardId.Pflug); }
     public void OnAlber(InputAction.CallbackContext context) { if (context.started) RequestGuard(GuardId.Alber); }
     public void OnOchs(InputAction.CallbackContext context) { if (context.started) RequestGuard(GuardId.Ochs); }
     public void OnIronGate(InputAction.CallbackContext context) { if (context.started) RequestGuard(GuardId.IronGate); }
+
+    public void OnSwitchMirroredGuard(InputAction.CallbackContext context)
+    {
+        if (context.started)
+            RequestGuardMirrored();
+    }
 
     // --- Realisation -----------------------------------------------------------
 
@@ -313,10 +342,10 @@ public sealed class CombatHandler : MonoBehaviour
 
         BlendPassWeight(0f);
 
-        if (_renderedGuard != Agent.Current && HasGuardState(Agent.Current))
+        if (_renderedGuard != Agent.CurrentKey && HasGuardState(Agent.CurrentKey))
         {
-            _animator.CrossFadeInFixedTime(GuardStateHash(Agent.Current), BlendDuration, _guardsLayer);
-            _renderedGuard = Agent.Current;
+            _animator.CrossFadeInFixedTime(GuardStateHash(Agent.CurrentKey), BlendDuration, _guardsLayer);
+            _renderedGuard = Agent.CurrentKey;
         }
     }
 
@@ -340,19 +369,19 @@ public sealed class CombatHandler : MonoBehaviour
         float passWeightTarget;
         if (visualProgress < 0.5f)
         {
-            if (_renderedGuard != transition.From && HasGuardState(transition.From))
+            if (_renderedGuard != transition.FromKey && HasGuardState(transition.FromKey))
             {
-                _animator.CrossFadeInFixedTime(GuardStateHash(transition.From), BlendDuration, _guardsLayer);
-                _renderedGuard = transition.From;
+                _animator.CrossFadeInFixedTime(GuardStateHash(transition.FromKey), BlendDuration, _guardsLayer);
+                _renderedGuard = transition.FromKey;
             }
             passWeightTarget = Mathf.Clamp01(visualProgress * 2f);
         }
         else
         {
-            if (_renderedGuard != transition.To && HasGuardState(transition.To))
+            if (_renderedGuard != transition.ToKey && HasGuardState(transition.ToKey))
             {
-                _animator.CrossFadeInFixedTime(GuardStateHash(transition.To), BlendDuration, _guardsLayer);
-                _renderedGuard = transition.To;
+                _animator.CrossFadeInFixedTime(GuardStateHash(transition.ToKey), BlendDuration, _guardsLayer);
+                _renderedGuard = transition.ToKey;
             }
             passWeightTarget = Mathf.Clamp01((1f - visualProgress) * 2f);
         }
@@ -383,14 +412,14 @@ public sealed class CombatHandler : MonoBehaviour
         PhaseChanged?.Invoke(phase);
     }
 
-    private bool HasGuardState(GuardId guard)
+    private bool HasGuardState(GuardKey guard)
     {
         var stateName = GuardIds.ToStateName(guard);
         return !string.IsNullOrEmpty(stateName) &&
                _animator.HasState(_guardsLayer, Animator.StringToHash(stateName));
     }
 
-    private int GuardStateHash(GuardId guard)
+    private int GuardStateHash(GuardKey guard)
     {
         return Animator.StringToHash(GuardIds.ToStateName(guard));
     }

@@ -24,9 +24,41 @@ namespace Spellbreakers.Combat
             _transitionCells =
                 new Dictionary<(TransitionDirection, TransitionDirection), CombatOutcome>();
 
+        private readonly HashSet<GuardId> _sideSensitive = new HashSet<GuardId>();
+
+        public ParryTable()
+        {
+            // Which guards only stop a strike that arrives on the opposite side. A cut thrown from the
+            // right side guard travels left to right across the defender, so the blade is only in the way
+            // if the defender is holding the left-side version of the guard. Same-side guards sit behind
+            // the incoming line and do nothing.
+            //
+            // Iron Gate and Pflug are deliberately absent: parrying a thrust is an active movement rather
+            // than a static interception, and that rule is still open. They stay side-agnostic, exactly as
+            // they behaved before sides existed.
+            _sideSensitive.Add(GuardId.VomTag);
+            _sideSensitive.Add(GuardId.Ochs);
+            _sideSensitive.Add(GuardId.Alber);
+        }
+
         public int GuardCellCount => _guardCells.Count;
 
         public int TransitionCellCount => _transitionCells.Count;
+
+        /// <summary>Whether this guard's static parry depends on which side it is held on.</summary>
+        public bool IsSideSensitive(GuardId guard) => _sideSensitive.Contains(guard);
+
+        /// <summary>Overrides whether a guard's static parry depends on the side it is held on.</summary>
+        public void SetSideSensitive(GuardId guard, bool sensitive)
+        {
+            if (guard == GuardId.None)
+                return;
+
+            if (sensitive)
+                _sideSensitive.Add(guard);
+            else
+                _sideSensitive.Remove(guard);
+        }
 
         /// <summary>Expected number of guard cells: every guard against every attack direction.</summary>
         public static int ExpectedGuardCells => GuardIds.All.Length * GuardIds.Directions.Length;
@@ -50,6 +82,35 @@ namespace Spellbreakers.Combat
             return _guardCells.TryGetValue((defenderGuard, attack), out var outcome)
                 ? outcome
                 : CombatOutcome.Undefined;
+        }
+
+        /// <summary>
+        /// The outcome of attacking a defender who is holding a guard on a specific side, thrown from
+        /// <paramref name="attackerSide"/>.
+        ///
+        /// This is the whole static-parry side rule: for a side-sensitive guard the authored outcome only
+        /// counts when the defender is holding the *opposite* side to the attacker's, because that is the
+        /// guard whose blade is actually on the line the strike travels along. A same-side guard is behind
+        /// the cut, so the blade reaches the body no matter how good the matchup looks in the table.
+        ///
+        /// An unknown attacker side cannot be judged, so the row is returned unchanged rather than
+        /// inventing a rule.
+        /// </summary>
+        public CombatOutcome ResolveGuard(GuardKey defenderGuard, TransitionDirection attack, GuardSide attackerSide)
+        {
+            var outcome = ResolveGuard(defenderGuard.Id, attack);
+
+            if (outcome == CombatOutcome.Undefined)
+                return CombatOutcome.Undefined;
+
+            if (!IsSideSensitive(defenderGuard.Id) ||
+                attackerSide == GuardSide.None ||
+                defenderGuard.Side == GuardSide.None)
+                return outcome;
+
+            return defenderGuard.Side == GuardIds.Opposite(attackerSide)
+                ? outcome
+                : CombatOutcome.HitBody;
         }
 
         /// <summary>The outcome of meeting <paramref name="attack"/> with a transition along <paramref name="defence"/>.</summary>
@@ -173,6 +234,10 @@ namespace Spellbreakers.Combat
 
             foreach (var entry in _transitionCells)
                 copy._transitionCells[entry.Key] = entry.Value;
+
+            copy._sideSensitive.Clear();
+            foreach (var guard in _sideSensitive)
+                copy._sideSensitive.Add(guard);
 
             return copy;
         }

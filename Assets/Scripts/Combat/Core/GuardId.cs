@@ -155,8 +155,53 @@ namespace Spellbreakers.Combat
             GuardSide.Left,
         };
 
-        /// <summary>Suffix appended to an Animator state name for a non-default side.</summary>
-        public const string LeftSideSuffix = ".L";
+        /// <summary>
+        /// Suffixes appended to a Guard state name for the side it is held on. Both sides are explicit in
+        /// the controller - <c>VomTag_R</c> and <c>VomTag_L</c> - so neither can be mistaken for the other
+        /// and there is no "default" spelling to remember.
+        ///
+        /// Underscore, not a dot: the Animator window normalises "VomTag.L" to "VomTag_L" on rename, so a
+        /// dotted suffix can never actually be authored on a state.
+        /// </summary>
+        public const string RightSideSuffix = "_R";
+
+        public const string LeftSideSuffix = "_L";
+
+        /// <summary>
+        /// The dotted form used by early notes and by nothing in the project any more. Parsing still
+        /// accepts it so an old name cannot silently read as a right-side guard; emitting never does.
+        /// </summary>
+        private const string LegacyLeftSideSuffix = ".L";
+
+        /// <summary>
+        /// The other side, or <see cref="GuardSide.None"/> for <see cref="GuardSide.None"/>. Used by the
+        /// mirror-switch intent and by the static-parry side rule.
+        /// </summary>
+        public static GuardSide Opposite(GuardSide side)
+        {
+            switch (side)
+            {
+                case GuardSide.Right: return GuardSide.Left;
+                case GuardSide.Left: return GuardSide.Right;
+                default: return GuardSide.None;
+            }
+        }
+
+        /// <summary>
+        /// Applies a side to a **Passes-layer** state name.
+        ///
+        /// Deliberately left-only for now, and not a bug: the guard states are authored with both suffixes,
+        /// but the pass states are still the raw correction-clip names on the right side, so a right-side
+        /// pass keeps its bare name. Renaming the pass layer is a separate, planned change - when it happens
+        /// this should become symmetric with <see cref="ToStateName(GuardKey)"/>.
+        /// </summary>
+        public static string ToPassStateName(string baseName, GuardSide side)
+        {
+            if (string.IsNullOrEmpty(baseName) || side != GuardSide.Left)
+                return baseName;
+
+            return baseName + LeftSideSuffix;
+        }
 
         public static bool IsCanonical(GuardId guard)
         {
@@ -194,8 +239,11 @@ namespace Spellbreakers.Combat
         }
 
         /// <summary>
-        /// The Animator state name for a guard. Kept here, next to the guard it belongs to, so the
-        /// Animator path is derived rather than repeated as a string literal in several systems.
+        /// The bare guard name, without a side suffix - "VomTag", not "VomTag_R".
+        ///
+        /// This is a base name for display and for <see cref="Parse"/>, not a state the Animator knows.
+        /// Kept here next to the guard it belongs to so the vocabulary lives in one place; use
+        /// <see cref="ToStateName(GuardKey)"/> to address an actual Animator state.
         /// </summary>
         public static string ToStateName(GuardId guard)
         {
@@ -215,21 +263,51 @@ namespace Spellbreakers.Combat
         /// Animator state name for a guard on a given side. The right side keeps the bare name so every
         /// existing state, clip and asset stays valid; only a left-side guard needs a distinct state.
         /// </summary>
+        /// <summary>
+        /// Animator state name for a guard on a given side: <c>VomTag_R</c> / <c>VomTag_L</c>.
+        ///
+        /// This is the only spelling the Animator knows. <see cref="ToStateName(GuardId)"/> returns the bare
+        /// base name and is for display and parsing, not for addressing a state.
+        /// </summary>
         public static string ToStateName(GuardKey guard)
         {
             var name = ToStateName(guard.Id);
-            if (string.IsNullOrEmpty(name) || guard.Side != GuardSide.Left)
+            if (string.IsNullOrEmpty(name))
                 return name;
 
-            return name + LeftSideSuffix;
+            switch (guard.Side)
+            {
+                case GuardSide.Right: return name + RightSideSuffix;
+                case GuardSide.Left: return name + LeftSideSuffix;
+                default: return name;
+            }
         }
 
         public static GuardSide ParseSide(string stateName)
         {
-            return !string.IsNullOrEmpty(stateName) &&
-                   stateName.EndsWith(LeftSideSuffix, StringComparison.OrdinalIgnoreCase)
-                ? GuardSide.Left
-                : GuardSide.Right;
+            if (string.IsNullOrEmpty(stateName))
+                return GuardSide.Right;
+
+            if (stateName.EndsWith(LeftSideSuffix, StringComparison.OrdinalIgnoreCase) ||
+                stateName.EndsWith(LegacyLeftSideSuffix, StringComparison.OrdinalIgnoreCase))
+                return GuardSide.Left;
+
+            return GuardSide.Right;
+        }
+
+        /// <summary>Strips whichever side suffix the name carries, including the legacy dotted form.</summary>
+        private static string TrimSideSuffix(string stateName)
+        {
+            if (stateName.EndsWith(RightSideSuffix, StringComparison.OrdinalIgnoreCase))
+                return stateName.Substring(0, stateName.Length - RightSideSuffix.Length);
+
+            if (stateName.EndsWith(LeftSideSuffix, StringComparison.OrdinalIgnoreCase))
+                return stateName.Substring(0, stateName.Length - LeftSideSuffix.Length);
+
+            if (stateName.EndsWith(LegacyLeftSideSuffix, StringComparison.OrdinalIgnoreCase))
+                return stateName.Substring(0, stateName.Length - LegacyLeftSideSuffix.Length);
+
+            return stateName;
         }
 
         /// <summary>Parses an Animator state name back into a guard, for migration and editor tooling.</summary>
@@ -239,9 +317,7 @@ namespace Spellbreakers.Combat
                 return GuardKey.None;
 
             var side = ParseSide(stateName);
-            var trimmed = side == GuardSide.Left
-                ? stateName.Substring(0, stateName.Length - LeftSideSuffix.Length)
-                : stateName;
+            var trimmed = TrimSideSuffix(stateName);
 
             for (var i = 0; i < All.Length; i++)
             {

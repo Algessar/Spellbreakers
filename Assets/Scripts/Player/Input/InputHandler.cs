@@ -70,6 +70,7 @@ namespace Player
                 player.Alber.started += _combat.OnAlber;
                 player.Ochs.started += _combat.OnOchs;
                 player.IronGate.started += _combat.OnIronGate;
+                player.SwitchMirroredGuard.started += _combat.OnSwitchMirroredGuard;
             }
 
             if (_targeting != null)
@@ -102,6 +103,7 @@ namespace Player
                 player.Alber.started -= _combat.OnAlber;
                 player.Ochs.started -= _combat.OnOchs;
                 player.IronGate.started -= _combat.OnIronGate;
+                player.SwitchMirroredGuard.started -= _combat.OnSwitchMirroredGuard;
             }
 
             if (_targeting != null)

@@ -344,7 +344,9 @@ namespace Spellbreakers.Combat
             Previous = restored;
             PreviousSide = CurrentSide;
             Current = restored;
-            CurrentSide = GuardSide.Right;
+
+            // Reviving restores the guard the fighter was holding, and that includes the side it was held
+            // on: forcing the right side here would silently mirror a left-guard fighter back on respawn.
             SecondsInGuard = 0f;
 
             var guardProfile = _table.GuardOr(restored);

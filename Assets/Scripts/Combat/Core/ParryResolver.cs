@@ -4,34 +4,43 @@ namespace Spellbreakers.Combat
     /// Decides how an incoming attack resolves against a defender, using the authored
     /// <see cref="ParryTable"/>.
     ///
-    /// The only rule this adds on top of the table is timing: a defender who is not inside a parry
+    /// Two rules are added on top of the table. The first is timing: a defender who is not inside a parry
     /// window cannot parry at all, no matter how favourable the matchup. That is what keeps the design
     /// doc's "reward reading and timing rather than holding block" promise - simply standing in Ochs
-    /// does not make a combatant safe.
+    /// does not make a combatant safe. The second is side: a static guard only intercepts a strike thrown
+    /// from the opposite side, which the table applies for the guards that are authored side-sensitive.
     /// </summary>
     public static class ParryResolver
     {
         /// <summary>
         /// Resolves an attack against a defender. <paramref name="defenderParryWindowOpen"/> comes from
         /// <see cref="FencingAgent.IsInParryWindow"/> so the resolver and the agent cannot disagree.
+        ///
+        /// The defender is passed as a <see cref="GuardKey"/> because the side it is held on now decides
+        /// whether a static guard is on the incoming line at all.
         /// </summary>
         public static CombatContact Resolve(
             GuardTransitionState attackerTransition,
-            GuardId defenderGuard,
+            GuardKey defenderGuard,
             GuardTransitionState defenderTransition,
             bool defenderParryWindowOpen,
             ParryTable table,
             float attackerProgress01)
         {
+            var attackerSide = attackerTransition.FromKey.Side;
+            var defenderSide = defenderGuard.Side;
+
             if (!attackerTransition.IsValid || table == null)
             {
                 return new CombatContact(
                     CombatOutcome.HitBody,
                     attackerTransition.From,
                     attackerTransition,
-                    defenderGuard,
+                    defenderGuard.Id,
                     defenderTransition.IsValid,
-                    attackerProgress01);
+                    attackerProgress01,
+                    attackerSide,
+                    defenderSide);
             }
 
             var defenderTransitioning = defenderTransition.IsValid;
@@ -43,22 +52,26 @@ namespace Spellbreakers.Combat
                     CombatOutcome.HitBody,
                     attackerTransition.From,
                     attackerTransition,
-                    defenderGuard,
+                    defenderGuard.Id,
                     defenderTransitioning,
-                    attackerProgress01);
+                    attackerProgress01,
+                    attackerSide,
+                    defenderSide);
             }
 
             var outcome = defenderTransitioning
                 ? table.ResolveTransition(defenderTransition.Direction, attackerTransition.Direction)
-                : table.ResolveGuard(defenderGuard, attackerTransition.Direction);
+                : table.ResolveGuard(defenderGuard, attackerTransition.Direction, attackerSide);
 
             return new CombatContact(
                 outcome,
                 attackerTransition.From,
                 attackerTransition,
-                defenderGuard,
+                defenderGuard.Id,
                 defenderTransitioning,
-                attackerProgress01);
+                attackerProgress01,
+                attackerSide,
+                defenderSide);
         }
 
         /// <summary>The reaction the attacker suffers for a given outcome. None means the attack stands.</summary>

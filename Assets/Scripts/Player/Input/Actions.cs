@@ -172,6 +172,15 @@ public partial class @Actions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""SwitchMirroredGuard"",
+                    ""type"": ""Button"",
+                    ""id"": ""0c481f0b-0f09-45d5-9043-1a5884c0edd6"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -504,6 +513,17 @@ public partial class @Actions: IInputActionCollection2, IDisposable
                     ""action"": ""Spirits"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""c0b1a233-5ee6-4c8a-98d5-405819973d0e"",
+                    ""path"": ""<Gamepad>/leftShoulder"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""SwitchMirroredGuard"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -521,6 +541,7 @@ public partial class @Actions: IInputActionCollection2, IDisposable
         m_Player_IronGate = m_Player.FindAction("IronGate", throwIfNotFound: true);
         m_Player_SwitchTarget = m_Player.FindAction("SwitchTarget", throwIfNotFound: true);
         m_Player_Spirits = m_Player.FindAction("Spirits", throwIfNotFound: true);
+        m_Player_SwitchMirroredGuard = m_Player.FindAction("SwitchMirroredGuard", throwIfNotFound: true);
     }
 
     ~@Actions()
@@ -610,6 +631,7 @@ public partial class @Actions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_IronGate;
     private readonly InputAction m_Player_SwitchTarget;
     private readonly InputAction m_Player_Spirits;
+    private readonly InputAction m_Player_SwitchMirroredGuard;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -657,6 +679,10 @@ public partial class @Actions: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player/Spirits".
         /// </summary>
         public InputAction @Spirits => m_Wrapper.m_Player_Spirits;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/SwitchMirroredGuard".
+        /// </summary>
+        public InputAction @SwitchMirroredGuard => m_Wrapper.m_Player_SwitchMirroredGuard;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -710,6 +736,9 @@ public partial class @Actions: IInputActionCollection2, IDisposable
             @Spirits.started += instance.OnSpirits;
             @Spirits.performed += instance.OnSpirits;
             @Spirits.canceled += instance.OnSpirits;
+            @SwitchMirroredGuard.started += instance.OnSwitchMirroredGuard;
+            @SwitchMirroredGuard.performed += instance.OnSwitchMirroredGuard;
+            @SwitchMirroredGuard.canceled += instance.OnSwitchMirroredGuard;
         }
 
         /// <summary>
@@ -748,6 +777,9 @@ public partial class @Actions: IInputActionCollection2, IDisposable
             @Spirits.started -= instance.OnSpirits;
             @Spirits.performed -= instance.OnSpirits;
             @Spirits.canceled -= instance.OnSpirits;
+            @SwitchMirroredGuard.started -= instance.OnSwitchMirroredGuard;
+            @SwitchMirroredGuard.performed -= instance.OnSwitchMirroredGuard;
+            @SwitchMirroredGuard.canceled -= instance.OnSwitchMirroredGuard;
         }
 
         /// <summary>
@@ -851,5 +883,12 @@ public partial class @Actions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnSpirits(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "SwitchMirroredGuard" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnSwitchMirroredGuard(InputAction.CallbackContext context);
     }
 }

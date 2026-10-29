@@ -6,14 +6,16 @@ namespace Spellbreakers.Combat
     /// <summary>
     /// The authored set of legal transitions, plus the guard profiles they resolve against.
     ///
-    /// Lookup is by (from, to). A transition that is not in the table simply does not exist - that is
-    /// how the guard language stays small and how the AI's action space is bounded by design rather
-    /// than by a hand-written list of special cases.
+    /// Lookup is by (from, to) *and the side each is held on*, because a right-side Vom Tag to Alber cut
+    /// and its left-side mirror are different poses. A transition that is not in the table simply does not
+    /// exist as an attack - that is how the guard language stays small and how the AI's action space is
+    /// bounded by design rather than by a hand-written list of special cases.
     /// </summary>
     public sealed class TransitionTable
     {
-        private readonly Dictionary<(GuardId From, GuardId To), TransitionProfile> _profiles =
-            new Dictionary<(GuardId, GuardId), TransitionProfile>();
+        private readonly Dictionary<(GuardId From, GuardSide FromSide, GuardId To, GuardSide ToSide), TransitionProfile>
+            _profiles =
+                new Dictionary<(GuardId, GuardSide, GuardId, GuardSide), TransitionProfile>();
 
         private readonly Dictionary<GuardId, GuardProfile> _guards = new Dictionary<GuardId, GuardProfile>();
 
@@ -44,7 +46,7 @@ namespace Spellbreakers.Combat
             if (profile == null)
                 return false;
 
-            var key = (profile.From, profile.To);
+            var key = (profile.From, profile.FromSide, profile.To, profile.ToSide);
             if (_profiles.ContainsKey(key))
                 return false;
 
@@ -54,8 +56,10 @@ namespace Spellbreakers.Combat
         }
 
         /// <summary>
-        /// Authored lookup by guard pair only, ignoring sides. Prefer <see cref="TryResolve"/> unless the
-        /// caller genuinely does not care which side the transition is authored for.
+        /// Authored lookup by guard pair only, ignoring sides, preferring the right-side expression.
+        ///
+        /// Prefer <see cref="TryResolve"/> or <see cref="TryGet(GuardKey, GuardKey, out TransitionProfile)"/>
+        /// unless the caller genuinely does not care which side the transition is authored for.
         /// </summary>
         public bool TryGet(GuardId from, GuardId to, out TransitionProfile profile)
         {
@@ -63,7 +67,18 @@ namespace Spellbreakers.Combat
             if (from == GuardId.None || to == GuardId.None)
                 return false;
 
-            return _profiles.TryGetValue((from, to), out profile) && profile != null;
+            return _profiles.TryGetValue((from, GuardSide.Right, to, GuardSide.Right), out profile) &&
+                   profile != null;
+        }
+
+        /// <summary>Authored lookup for an exact guard-and-side pair.</summary>
+        public bool TryGet(GuardKey from, GuardKey to, out TransitionProfile profile)
+        {
+            profile = null;
+            if (!from.IsValid || !to.IsValid)
+                return false;
+
+            return _profiles.TryGetValue((from.Id, from.Side, to.Id, to.Side), out profile) && profile != null;
         }
 
         /// <summary>
@@ -93,20 +108,18 @@ namespace Spellbreakers.Combat
             if (!from.IsValid || !to.IsValid)
                 return false;
 
-            if (_profiles.TryGetValue((from.Id, to.Id), out var authored) && authored != null)
+            // The authored expression belongs to one specific guard-and-side pair. Moving between any
+            // other combination is still legal, it just falls through to a synthesised traversal below.
+            if (_profiles.TryGetValue((from.Id, from.Side, to.Id, to.Side), out var authored) &&
+                authored != null)
             {
-                // The authored expression belongs to specific sides. Asking to execute it from or onto a
-                // side it was never authored for would run a pose that does not exist.
-                if (authored.FromSide == from.Side && authored.ToSide == to.Side)
-                {
-                    profile = authored;
-                    return true;
-                }
-
-                return false;
+                profile = authored;
+                return true;
             }
 
-            // Nothing authored. A request for the state already held is a no-op, not a traversal.
+            // Nothing authored. A request for the state already held is a no-op, not a traversal. A side
+            // switch is not the same state, so "R Vom Tag -> L Vom Tag" is a traversal and mirror-switching
+            // therefore always works, even for a guard pair that has no authored attack.
             if (from == to || !AllowSynthesis)
                 return false;
 
@@ -324,7 +337,40 @@ namespace Spellbreakers.Combat
             Author(GuardId.IronGate, GuardId.Ochs, TransitionDirection.Unterhau, "Unterhau",
                 pose: GuardId.Pflug, poseInKrieg: GuardId.Langort);
 
+            table.MirrorToLeftSide();
+
             return table;
+        }
+
+        /// <summary>
+        /// Authors the left-side counterpart of every right-side transition, so a fighter leading with the
+        /// other foot has the same attack language rather than being reduced to non-damaging traversals.
+        ///
+        /// Handedness lives in the guard side, not in <see cref="TransitionDirection"/> - the direction names
+        /// the *line* (Oberhau, Mittelhau ...), and a right-side Oberhau travels right-to-left while its
+        /// left-side mirror travels left-to-right. The direction value therefore carries over unchanged, and
+        /// only the side and the pass state name (which gains the ".L" suffix) differ.
+        /// </summary>
+        private void MirrorToLeftSide()
+        {
+            var rightSide = new List<TransitionProfile>();
+            for (var i = 0; i < _ordered.Count; i++)
+            {
+                if (_ordered[i].FromSide == GuardSide.Right && _ordered[i].ToSide == GuardSide.Right)
+                    rightSide.Add(_ordered[i]);
+            }
+
+            for (var i = 0; i < rightSide.Count; i++)
+            {
+                var source = rightSide[i];
+
+                var mirrored = source.Clone();
+                mirrored.FromSide = GuardSide.Left;
+                mirrored.ToSide = GuardSide.Left;
+                mirrored.PassStateName = GuardIds.ToPassStateName(source.PassStateName, GuardSide.Left);
+
+                AddOrThrow(this, mirrored);
+            }
         }
     }
 }

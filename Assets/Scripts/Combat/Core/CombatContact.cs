@@ -53,7 +53,9 @@ namespace Spellbreakers.Combat
             GuardTransitionState attackerTransition,
             GuardId defenderGuard,
             bool defenderWasTransitioning,
-            float progress01)
+            float progress01,
+            GuardSide attackerSide = GuardSide.None,
+            GuardSide defenderSide = GuardSide.None)
         {
             Outcome = outcome;
             AttackerGuard = attackerGuard;
@@ -61,6 +63,8 @@ namespace Spellbreakers.Combat
             DefenderGuard = defenderGuard;
             DefenderWasTransitioning = defenderWasTransitioning;
             Progress01 = progress01;
+            AttackerSide = attackerSide;
+            DefenderSide = defenderSide;
         }
 
         public CombatOutcome Outcome { get; }
@@ -70,6 +74,13 @@ namespace Spellbreakers.Combat
         public GuardTransitionState AttackerTransition { get; }
 
         public GuardId DefenderGuard { get; }
+
+        /// <summary>Which side the attack was thrown from. With <see cref="DefenderSide"/> this is what the
+        /// static-parry side rule is decided on.</summary>
+        public GuardSide AttackerSide { get; }
+
+        /// <summary>Which side the defender was holding its guard on.</summary>
+        public GuardSide DefenderSide { get; }
 
         public bool DefenderWasTransitioning { get; }
 
@@ -83,8 +94,8 @@ namespace Spellbreakers.Combat
 
         public string Describe()
         {
-            var attacker = GuardIds.ToDisplayName(AttackerGuard);
-            var defender = GuardIds.ToDisplayName(DefenderGuard);
+            var attacker = GuardIds.ToDisplayName(new GuardKey(AttackerGuard, AttackerSide));
+            var defender = GuardIds.ToDisplayName(new GuardKey(DefenderGuard, DefenderSide));
             var mode = DefenderWasTransitioning ? "meeting" : "holding";
             return $"{Outcome}: {attacker} attacking {defender} ({mode}) at {Progress01:0.00}";
         }

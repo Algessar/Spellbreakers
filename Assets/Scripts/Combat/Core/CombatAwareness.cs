@@ -5,9 +5,9 @@ namespace Spellbreakers.Combat
     /// <summary>
     /// Decides whether a character is in combat, from nothing but the distance to the nearest hostile.
     ///
-    /// The design doc (Stance.md) wants combat to start when an enemy comes into relevant range rather
-    /// than when the player presses a "draw the sword" button, and it wants leaving combat to be just as
-    /// automatic. Two radii rather than one is what makes that bearable: entering at the edge would
+    /// The design doc (Combat.md, "Combat State") wants combat to start when an enemy comes into relevant
+    /// range rather than when the player presses a "draw the sword" button, and it wants leaving combat to be
+    /// just as automatic. Two radii rather than one is what makes that bearable: entering at the edge would
     /// otherwise flicker the guard on and off every time a fighter stepped over the line.
     ///
     /// It is deliberately engine-free and clock-free - the caller supplies delta time - so the hysteresis

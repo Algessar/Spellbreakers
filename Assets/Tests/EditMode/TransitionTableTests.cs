@@ -127,10 +127,76 @@ namespace Spellbreakers.Tests
 
             foreach (var profile in table.Profiles)
             {
-                var found = table.TryGet(profile.From, profile.To, out var retrieved);
+                // Keyed on the side as well: a right-side Vom Tag -> Alber cut and its left-side mirror are
+                // separate authored rows, so a side-blind lookup could only ever find one of them.
+                var found = table.TryGet(profile.FromKey, profile.ToKey, out var retrieved);
 
                 Assert.That(found, Is.True, profile.DisplayName);
                 Assert.That(retrieved, Is.SameAs(profile));
+            }
+        }
+
+        /// <summary>
+        /// Every right-side authored cut has a left-side mirror, so a fighter leading with the other foot
+        /// keeps the whole attack language instead of falling back to non-damaging traversals.
+        /// </summary>
+        [Test]
+        public void CreateDefault_MirrorsEveryAttackOntoTheLeftSide()
+        {
+            var table = TransitionTable.CreateDefault();
+            var rightCount = 0;
+            var leftCount = 0;
+
+            foreach (var profile in table.Profiles)
+            {
+                Assert.That(profile.FromSide, Is.EqualTo(profile.ToSide),
+                    $"{profile.DisplayName}: a cut starts and ends on the same leading side");
+
+                if (profile.FromSide == GuardSide.Right)
+                {
+                    rightCount++;
+
+                    Assert.That(table.TryGet(profile.FromKey.OppositeSide, profile.ToKey.OppositeSide, out var mirror),
+                        Is.True, $"{profile.DisplayName} has no left-side mirror");
+
+                    Assert.That(mirror.Direction, Is.EqualTo(profile.Direction),
+                        "handedness lives in the side, so the attack line carries over unchanged");
+                    Assert.That(mirror.HasDamageWindow, Is.EqualTo(profile.HasDamageWindow));
+                    Assert.That(mirror.PassStateName, Is.EqualTo(profile.PassStateName + GuardIds.LeftSideSuffix));
+                    Assert.That(mirror, Is.Not.SameAs(profile), "the mirror must be its own row, not a shared alias");
+                }
+                else
+                {
+                    leftCount++;
+                }
+            }
+
+            Assert.That(rightCount, Is.GreaterThan(0));
+            Assert.That(leftCount, Is.EqualTo(rightCount), "the left side mirrors the right one exactly");
+        }
+
+        /// <summary>
+        /// Switching which side the same guard is held on is a traversal, not an authored attack: the design
+        /// doc's "R Vom Tag -> L Vom Tag" reads as a side switch, and the mirror input must always work even
+        /// for a guard that has no authored left-side attack out of it.
+        /// </summary>
+        [Test]
+        public void TryResolve_ASideSwitchIsAlwaysTraversableAndNeverAnAttack()
+        {
+            var table = TransitionTable.CreateDefault();
+
+            foreach (var guard in GuardIds.Destinations)
+            {
+                var right = GuardKey.Right(guard);
+                var left = GuardKey.Left(guard);
+
+                Assert.That(table.TryGet(right, left, out _), Is.False,
+                    "a side switch must not be mistaken for the authored same-side attack");
+
+                Assert.That(table.TryResolve(right, left, out var profile), Is.True,
+                    $"{GuardIds.ToDisplayName(right)} -> {GuardIds.ToDisplayName(left)} must be traversable");
+                Assert.That(profile.HasDamageWindow, Is.False, "mirroring a guard is not an attack");
+                Assert.That(profile.IsSideSwitch, Is.True);
             }
         }
 

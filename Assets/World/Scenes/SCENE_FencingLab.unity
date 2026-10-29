@@ -1012,19 +1012,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5979048228967184532, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
       propertyPath: HorizontalAxis.Value
-      value: 0
+      value: 50
       objectReference: {fileID: 0}
     - target: {fileID: 5979048228967184532, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
       propertyPath: HorizontalAxis.Center
-      value: 50
+      value: 179.30563
       objectReference: {fileID: 0}
     - target: {fileID: 5979048228967184532, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
       propertyPath: HorizontalAxis.Range.x
-      value: -50
+      value: -180
       objectReference: {fileID: 0}
     - target: {fileID: 5979048228967184532, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
       propertyPath: HorizontalAxis.Range.y
-      value: 50
+      value: 180
       objectReference: {fileID: 0}
     - target: {fileID: 5979048228967184532, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
       propertyPath: HorizontalAxis.Recentering.Wait
@@ -1032,7 +1032,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5979048228967184532, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
       propertyPath: HorizontalAxis.Recentering.Enabled
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7231959923295431543, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
       propertyPath: m_LocalPosition.x
