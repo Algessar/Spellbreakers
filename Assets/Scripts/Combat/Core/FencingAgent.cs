@@ -29,6 +29,14 @@ namespace Spellbreakers.Combat
 
         /// <summary>Which side the queued request asked for, so a side switch survives the queue.</summary>
         private GuardSide _queuedGuardSide = GuardSide.Right;
+
+        /// <summary>
+        /// A queued mirror request. Kept as an intent rather than a captured destination guard, because the
+        /// guard it should apply to is whichever one the committed transition lands in - not the one the
+        /// fighter happened to be in when the button was pressed.
+        /// </summary>
+        private bool _queuedMirror;
+
         private ReactionState _reaction;
 
         public FencingAgent(TransitionTable table, GuardId initialGuard)
@@ -216,6 +224,57 @@ namespace Spellbreakers.Combat
         }
 
         /// <summary>
+        /// Asks to hold the current guard on its other side: right-side Alber becomes left-side Alber, and
+        /// so on for every guard. This is the mirror-switch intent of design doc 4, and it is the only way to
+        /// reach a left-side guard, which the static-parry side rule needs.
+        ///
+        /// It is deliberately a request of its own rather than "request the guard I am in, on the other
+        /// side", because those two are not the same thing while a transition is in flight. Guard changes
+        /// take a third of a second, so a mirror pressed just after a guard button is pressed almost always
+        /// lands mid-transition - and resolving "the guard I am in" then means resolving the guard being
+        /// *left*. That is what made the mirror button look like it was producing the wrong guard: it was,
+        /// faithfully, mirroring the previous one. The intent is deferred instead, and applied to whatever
+        /// guard the committed transition actually reaches.
+        /// </summary>
+        public RequestResult RequestMirror(float distanceToOpponent)
+        {
+            _lastKnownDistance = distanceToOpponent;
+            _lastKnownMeasure = ClassifyMeasure(distanceToOpponent);
+
+            if (!IsAlive)
+                return RequestResult.Rejected;
+
+            if (_reaction != ReactionState.None)
+                return RequestResult.Rejected;
+
+            if (IsTransitioning)
+            {
+                if (IsCommitted)
+                {
+                    // Queue the intent, superseding any queued guard: last intent wins, as it does for
+                    // guard requests.
+                    _queuedMirror = true;
+                    _queuedGuard = GuardId.None;
+                    return RequestResult.Queued;
+                }
+
+                CancelTransition("Superseded by a mirror request before commitment.");
+            }
+
+            return MirrorCurrentGuard(distanceToOpponent);
+        }
+
+        /// <summary>Resolves the mirror intent against the guard held right now.</summary>
+        private RequestResult MirrorCurrentGuard(float distanceToOpponent)
+        {
+            var side = GuardIds.Opposite(CurrentSide);
+            if (side == GuardSide.None)
+                return RequestResult.Rejected;
+
+            return RequestGuard(Current, side, distanceToOpponent);
+        }
+
+        /// <summary>
         /// Advances the clock. Reactions freeze it entirely, which is what turns a parry or a guard
         /// break into a genuine opening instead of a cosmetic flourish.
         /// </summary>
@@ -278,6 +337,12 @@ namespace Spellbreakers.Combat
             _elapsed = 0f;
             _duration = 0f;
             _feintRemaining = -1f;
+
+            // A cancelled transition takes its queued follow-up with it. Leaving the queue behind meant a
+            // request that was never going to start could fire on the next unrelated completion.
+            _queuedGuard = GuardId.None;
+            _queuedMirror = false;
+
             SetPhase(PassPhase.None);
             TransitionFailed?.Invoke(aborted, reason);
         }
@@ -305,6 +370,7 @@ namespace Spellbreakers.Combat
             _duration = 0f;
             _feintRemaining = -1f;
             _queuedGuard = GuardId.None;
+            _queuedMirror = false;
             Previous = Current;
             PreviousSide = CurrentSide;
             Current = guard.Id;
@@ -338,6 +404,7 @@ namespace Spellbreakers.Combat
             _duration = 0f;
             _feintRemaining = -1f;
             _queuedGuard = GuardId.None;
+            _queuedMirror = false;
             _reaction = ReactionState.None;
             _reactionRemaining = 0f;
 
@@ -427,8 +494,14 @@ namespace Spellbreakers.Combat
 
             var queued = _queuedGuard;
             var queuedSide = _queuedGuardSide;
+            var queuedMirror = _queuedMirror;
             _queuedGuard = GuardId.None;
-            if (queued != GuardId.None)
+            _queuedMirror = false;
+
+            // The mirror is resolved *here*, against the guard this transition has just reached.
+            if (queuedMirror)
+                RequestMirror(_lastKnownDistance);
+            else if (queued != GuardId.None)
                 RequestGuard(queued, queuedSide, _lastKnownDistance);
         }
 

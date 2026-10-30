@@ -387,7 +387,7 @@ namespace Spellbreakers.Combat
                         ? ZufechtenColor
                         : Color.white;
 
-                var text = $"{GuardIds.ToDisplayName(agent.Current)}  {agent.Phase}";
+                var text = $"{GuardIds.ToDisplayName(agent.CurrentKey)}  {agent.Phase}";
                 if (agent.IsTransitioning)
                     text += $"  {agent.Progress01:0.00}";
 

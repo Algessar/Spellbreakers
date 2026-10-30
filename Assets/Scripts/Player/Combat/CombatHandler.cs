@@ -291,19 +291,22 @@ public sealed class CombatHandler : MonoBehaviour
     // --- Player input bindings -------------------------------------------------
 
     /// <summary>
-    /// Clears the current guard and starts holding its mirror. This is the whole of the mirror input: it
-    /// is a guard request like any other, so it obeys the same commitment, queuing and reaction rules
-    /// rather than teleporting the pose.
+    /// Flips the guard onto its other side: right-side Alber becomes left-side Alber. This is the whole of
+    /// the mirror input, and it is delegated to the agent rather than built here, because the intent has to
+    /// survive being pressed mid-transition - see <see cref="FencingAgent.RequestMirror"/>. Resolving
+    /// "the guard I am in" in this method would resolve the guard being *left*, which is how the mirror
+    /// button ended up producing the previous guard's opposite instead of the current one's.
     ///
-    /// A side switch is a traversal, never an attack, so mirroring is always available - including from a
-    /// guard that has no authored left-side attack out of it.
+    /// A side switch is a traversal unless the table expresses it as an attack (the doc's
+    /// "R Vom Tag -> L Vom Tag = Zornhau"), so mirroring is always available - including from a guard that
+    /// has no authored left-side attack out of it.
     /// </summary>
     public RequestResult RequestGuardMirrored()
     {
         if (!_initialized || !CombatActive || Agent == null)
             return RequestResult.Rejected;
 
-        return Agent.RequestGuard(Agent.Current, GuardIds.Opposite(Agent.CurrentSide), _opponentDistance);
+        return Agent.RequestMirror(_opponentDistance);
     }
 
     public void OnVomTag(InputAction.CallbackContext context) { if (context.started) RequestGuard(GuardId.VomTag); }

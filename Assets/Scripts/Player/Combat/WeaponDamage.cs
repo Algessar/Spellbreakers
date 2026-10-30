@@ -373,7 +373,9 @@ public sealed class WeaponDamage : MonoBehaviour
             attackerTransition,
             defenderHandler != null ? defenderHandler.CurrentGuard : GuardId.None,
             defenderHandler != null && defenderHandler.IsTransitioning,
-            progress);
+            progress,
+            attacker != null ? attacker.CurrentSide : GuardSide.None,
+            defenderHandler != null ? defenderHandler.CurrentSide : GuardSide.None);
 
         _struckThisStrike = true;
 

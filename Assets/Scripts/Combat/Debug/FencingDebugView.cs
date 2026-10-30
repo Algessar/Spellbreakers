@@ -75,7 +75,7 @@ namespace Spellbreakers.Combat
             {
                 var playerLines = new[]
                 {
-                    $"player   guard {GuardIds.ToDisplayName(playerAgent.Current)}  phase {playerAgent.Phase}" +
+                    $"player   guard {GuardIds.ToDisplayName(playerAgent.CurrentKey)}  phase {playerAgent.Phase}" +
                     (playerAgent.IsTransitioning ? $"  {playerAgent.Progress01:0.00}" : string.Empty) +
                     $"  reaction {playerAgent.Reaction}  vor {playerAgent.Vor}",
                     $"         blade live {(playerAgent.IsInDamageWindow ? "YES" : "no")}   " +
@@ -112,7 +112,7 @@ namespace Spellbreakers.Combat
 
                 GUI.Label(
                     new Rect(10f, y, 900f, 18f),
-                    $"{combatant.name,-18} {combatant.Team,-7} {GuardIds.ToDisplayName(agent.Current),-9} " +
+                    $"{combatant.name,-18} {combatant.Team,-7} {GuardIds.ToDisplayName(agent.CurrentKey),-16} " +
                     $"{agent.Phase,-6} {(agent.IsTransitioning ? agent.Progress01.ToString("0.00") : "  - ")} " +
                     $"d={distance:0.00} {measure} hp={combatant.CurrentHealth:0}/{combatant.MaxHealth:0}",
                     _panelStyle);
