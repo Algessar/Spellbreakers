@@ -71,6 +71,7 @@ namespace Spellbreakers.EditorTools
                 SpawnEnemy(notes);
                 SpawnTrainingDummy(notes);
                 BuildCamera(player, notes);
+                BuildAudio(notes);
 
                 EditorSceneManager.MarkSceneDirty(scene);
                 FencingEditorSetup.EnsureFolder(SceneFolder);
@@ -247,6 +248,29 @@ namespace Spellbreakers.EditorTools
 
             dummy.transform.rotation = Quaternion.Euler(DummyEuler);
             notes.Add($"dummy: '{dummy.name}' at {DummyPosition} (Neutral, so it is nobody's enemy)");
+        }
+
+        private static void BuildAudio(List<string> notes)
+        {
+            // The lab is where combat results get judged, and judging them by eye is exactly the thing the
+            // sound manager exists to avoid. The profile is optional: the manager falls back to
+            // Resources/CombatSoundProfile at runtime, so a lab built before the profile exists still works
+            // once one is created.
+            var profile = AssetDatabase.LoadAssetAtPath<CombatSoundProfile>(
+                "Assets/Resources/" + CombatSoundManager.ProfileResourcesPath + ".asset");
+
+            var manager = CombatSoundSetup.EnsureManagerInScene(profile, enableDebugReadout: true);
+            if (manager == null)
+            {
+                notes.Add("audio: FAILED - no Combat Sound Manager could be added");
+                return;
+            }
+
+            notes.Add(profile != null
+                ? $"audio: '{manager.name}' wired to '{profile.name}' ({profile.SliceCount} excerpts, " +
+                  $"{profile.AssignedCueCount} cues). F4 auditions the library."
+                : $"audio: '{manager.name}' added with no profile assigned - run " +
+                  "Spellbreakers/Audio/Create Combat Sound Profile to hear anything.");
         }
 
         private static void BuildCamera(GameObject player, List<string> notes)

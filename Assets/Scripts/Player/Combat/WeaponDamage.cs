@@ -13,6 +13,11 @@ using UnityEngine;
 /// The important behaviour is that contact is resolved through <see cref="ParryResolver"/> rather than
 /// applied as damage. Two blades meeting is a real outcome with a real consequence, and the outcome is
 /// decided by which guard or transition each fighter is in and by whether the defender timed it.
+///
+/// It is also the only place that knows an attack whiffed: the strike window opened and closed without
+/// touching anything. Because that leaves no other trace, this component reports every result it produces
+/// as a <see cref="CombatSoundCue"/> - swing, miss, hit, parry, deflect, bind, death - so the fight can be
+/// followed by ear. Audio is not required: with nothing listening, each request is dropped.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class WeaponDamage : MonoBehaviour
@@ -50,6 +55,13 @@ public sealed class WeaponDamage : MonoBehaviour
     private Vector3 _previousTip;
     private bool _hasPreviousSample;
     private bool _armed;
+
+    /// <summary>
+    /// Whether this strike window connected with anything. Reset when the window opens, and read when it
+    /// closes: a live blade that touched nothing is a miss, which is the one combat result that leaves no
+    /// other trace. Without it "I swung and nothing happened" is indistinguishable from "I never swung".
+    /// </summary>
+    private bool _struckThisStrike;
 
     /// <summary>Blade direction and speed at the last sweep, read by the deflection model.</summary>
     private Vector3 _lastTravelDirection;
@@ -121,22 +133,47 @@ public sealed class WeaponDamage : MonoBehaviour
             _owner.PhaseChanged -= OnPhaseChanged;
 
         _armed = false;
+        _struckThisStrike = false;
         _hasPreviousSample = false;
     }
 
     private void OnPhaseChanged(PassPhase phase)
     {
+        var wasArmed = _armed;
         _armed = phase == PassPhase.Strike;
 
         if (!_armed)
         {
+            // The window closed and the swing is following through untouched: a whiff. Only the Settle phase
+            // counts, because the other ways out of a strike window - cancelled input, a feint, combat
+            // ending, the component being disabled - are not attacks that missed, and sounding like one
+            // would teach the ear the wrong lesson.
+            if (wasArmed && phase == PassPhase.Settle && !_struckThisStrike)
+            {
+                CombatSoundEvents.Request(new CombatSoundEvent(
+                    CombatSoundCue.Miss,
+                    BladePosition(),
+                    OwnerName,
+                    null,
+                    AttackerProgress));
+            }
+
+            _struckThisStrike = false;
             _hasPreviousSample = false;
             return;
         }
 
         _affectedThisStrike.Clear();
+        _struckThisStrike = false;
         Sample();
         _hasPreviousSample = true;
+
+        CombatSoundEvents.Request(new CombatSoundEvent(
+            CombatSoundCue.Swing,
+            BladePosition(),
+            OwnerName,
+            null,
+            AttackerProgress));
     }
 
     /// <summary>
@@ -338,8 +375,19 @@ public sealed class WeaponDamage : MonoBehaviour
             defenderHandler != null && defenderHandler.IsTransitioning,
             progress);
 
+        _struckThisStrike = true;
+
         if (_logContacts)
             Debug.Log($"[Weapon] {name} -> {contact.Describe()}", this);
+
+        // One request per resolved contact, not per combatant: the contact is a single event in the world
+        // even though both fighters hear about it.
+        CombatSoundEvents.Request(new CombatSoundEvent(
+            SoundCueFor(outcome),
+            ContactPosition(target),
+            OwnerName,
+            target != null ? target.name : null,
+            progress));
 
         // Both sides hear about the contact, so feedback and AI reactions can respond to either role.
         _owner?.ReportContact(contact);
@@ -351,6 +399,19 @@ public sealed class WeaponDamage : MonoBehaviour
             case CombatOutcome.Undefined:
                 target.ApplyDamage(new HitInfo(_damage, attackerGuard, attackerTransition, CombatOutcome.HitBody, progress));
                 defenderHandler?.ApplyReaction(ReactionState.Hit, 0.25f);
+
+                // Death is a consequence of the hit, so it is announced after the damage has landed and the
+                // health is actually zero - not predicted from the outcome.
+                if (target.IsDead)
+                {
+                    CombatSoundEvents.Request(new CombatSoundEvent(
+                        CombatSoundCue.Death,
+                        ContactPosition(target),
+                        OwnerName,
+                        target.name,
+                        progress));
+                }
+
                 break;
 
             case CombatOutcome.Parry:
@@ -372,6 +433,47 @@ public sealed class WeaponDamage : MonoBehaviour
                 break;
         }
     }
+
+    /// <summary>
+    /// The cue that answers each outcome. Kept as a mapping rather than a switch at the call site so a new
+    /// <see cref="CombatOutcome"/> has exactly one place to be given a sound.
+    /// </summary>
+    private static CombatSoundCue SoundCueFor(CombatOutcome outcome)
+    {
+        switch (outcome)
+        {
+            case CombatOutcome.Parry: return CombatSoundCue.Parry;
+            case CombatOutcome.Deflect: return CombatSoundCue.Deflect;
+            case CombatOutcome.Bind: return CombatSoundCue.Bind;
+            default: return CombatSoundCue.HitBody;
+        }
+    }
+
+    /// <summary>Halfway between the blade that arrived and the body it reached, so 3D falloff reads as
+    /// distance from the clash rather than from whoever happened to report it.</summary>
+    private Vector3 ContactPosition(Damageable target)
+    {
+        var blade = BladePosition();
+        if (target == null)
+            return blade;
+
+        return Vector3.Lerp(blade, target.AimPosition, 0.5f);
+    }
+
+    private Vector3 BladePosition()
+    {
+        if (_blade != null && _blade.IsValid)
+            return _blade.TipPosition;
+
+        return transform.position;
+    }
+
+    /// <summary>The character's name rather than the weapon object's, because the sound log is read next to
+    /// the combat log, which talks about characters.</summary>
+    private string OwnerName =>
+        _owner != null ? _owner.name : (transform.root != null ? transform.root.name : name);
+
+    private float AttackerProgress => _owner != null && _owner.Agent != null ? _owner.Agent.Progress01 : 0f;
 
     private CombatHandler ResolveHandler(Damageable target)
     {

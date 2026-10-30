@@ -1,0 +1,222 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 52944d4df46ae0f4a831dc07e3a4cb4c, type: 3}
+  m_Name: CombatSoundProfile
+  m_EditorClassIdentifier: Spellbreakers.Gameplay::Spellbreakers.Combat.CombatSoundProfile
+  _entries:
+  - Cue: 0
+    Clips:
+      _slices: []
+      _volume: 1
+      _pitchRange: {x: 0.94, y: 1.06}
+      _minInterval: 0.04
+      _avoidImmediateRepeat: 1
+  - Cue: 1
+    Clips:
+      _slices:
+      - _clip: {fileID: 8300000, guid: 2b93b02b1fc099647aada6e3d9e158df, type: 3}
+        _start: 0.029909296
+        _length: 0.29936507
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 2b93b02b1fc099647aada6e3d9e158df, type: 3}
+        _start: 1.1074603
+        _length: 0.28938782
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 2b93b02b1fc099647aada6e3d9e158df, type: 3}
+        _start: 2.1800227
+        _length: 0.29437637
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 2b93b02b1fc099647aada6e3d9e158df, type: 3}
+        _start: 3.2775283
+        _length: 0.33428574
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 2b93b02b1fc099647aada6e3d9e158df, type: 3}
+        _start: 4.3500905
+        _length: 0.26943302
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 2b93b02b1fc099647aada6e3d9e158df, type: 3}
+        _start: 5.4675508
+        _length: 0.3392744
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 2b93b02b1fc099647aada6e3d9e158df, type: 3}
+        _start: 6.525147
+        _length: 0.32929707
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 2b93b02b1fc099647aada6e3d9e158df, type: 3}
+        _start: 7.622653
+        _length: 0.37419462
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 2b93b02b1fc099647aada6e3d9e158df, type: 3}
+        _start: 8.680249
+        _length: 0.32929707
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 2b93b02b1fc099647aada6e3d9e158df, type: 3}
+        _start: 9.802698
+        _length: 0.4390478
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 2b93b02b1fc099647aada6e3d9e158df, type: 3}
+        _start: 10.890226
+        _length: 0.3741951
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 2b93b02b1fc099647aada6e3d9e158df, type: 3}
+        _start: 12.002698
+        _length: 0.36920643
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 2b93b02b1fc099647aada6e3d9e158df, type: 3}
+        _start: 13.0852375
+        _length: 0.41410446
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 2b93b02b1fc099647aada6e3d9e158df, type: 3}
+        _start: 14.1578
+        _length: 0.41410446
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 2b93b02b1fc099647aada6e3d9e158df, type: 3}
+        _start: 15.27526
+        _length: 0.5737419
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      _volume: 1
+      _pitchRange: {x: 0.94, y: 1.06}
+      _minInterval: 0.04
+      _avoidImmediateRepeat: 1
+  - Cue: 2
+    Clips:
+      _slices: []
+      _volume: 1
+      _pitchRange: {x: 0.94, y: 1.06}
+      _minInterval: 0.04
+      _avoidImmediateRepeat: 1
+  - Cue: 3
+    Clips:
+      _slices:
+      - _clip: {fileID: 8300000, guid: 0c58a34f6c3e86248a16a9a65771db1f, type: 3}
+        _start: 1.64
+        _length: 1.4799999
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 0c58a34f6c3e86248a16a9a65771db1f, type: 3}
+        _start: 3.2749999
+        _length: 2.515
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 0c58a34f6c3e86248a16a9a65771db1f, type: 3}
+        _start: 5.955
+        _length: 1.2399998
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 0c58a34f6c3e86248a16a9a65771db1f, type: 3}
+        _start: 7.3199997
+        _length: 2.3550005
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 0c58a34f6c3e86248a16a9a65771db1f, type: 3}
+        _start: 10.03
+        _length: 3.9899998
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 0c58a34f6c3e86248a16a9a65771db1f, type: 3}
+        _start: 14.165
+        _length: 0.5749998
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 0c58a34f6c3e86248a16a9a65771db1f, type: 3}
+        _start: 15.12
+        _length: 0.8449993
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 0c58a34f6c3e86248a16a9a65771db1f, type: 3}
+        _start: 16.23
+        _length: 2.7749996
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      - _clip: {fileID: 8300000, guid: 0c58a34f6c3e86248a16a9a65771db1f, type: 3}
+        _start: 19.085
+        _length: 2.005001
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      _volume: 1
+      _pitchRange: {x: 0.94, y: 1.06}
+      _minInterval: 0.04
+      _avoidImmediateRepeat: 1
+  - Cue: 4
+    Clips:
+      _slices: []
+      _volume: 1
+      _pitchRange: {x: 0.94, y: 1.06}
+      _minInterval: 0.04
+      _avoidImmediateRepeat: 1
+  - Cue: 5
+    Clips:
+      _slices:
+      - _clip: {fileID: 8300000, guid: 2651466e206d51b429902a96fda0f374, type: 3}
+        _start: 0.08
+        _length: 0.795
+        _fadeIn: 0.005
+        _fadeOut: 0.02
+        _gain: 1
+      _volume: 1
+      _pitchRange: {x: 0.94, y: 1.06}
+      _minInterval: 0.04
+      _avoidImmediateRepeat: 1
+  - Cue: 6
+    Clips:
+      _slices: []
+      _volume: 1
+      _pitchRange: {x: 0.94, y: 1.06}
+      _minInterval: 0.04
+      _avoidImmediateRepeat: 1
+  - Cue: 7
+    Clips:
+      _slices: []
+      _volume: 1
+      _pitchRange: {x: 0.94, y: 1.06}
+      _minInterval: 0.04
+      _avoidImmediateRepeat: 1
+  _muted: 0
