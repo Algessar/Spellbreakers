@@ -720,3 +720,7 @@ Combat timing is decided there, never by reading Animator normalised time.
 - Per-species parry relations versus a shared physical gradient (6).
 - Whether a non-humanoid can use the guard-transition language at all, or only the physical layer (6).
 - All Targeting bugs listed in 15.
+
+# Systems refactor
+
+

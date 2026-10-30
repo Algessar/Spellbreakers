@@ -23,7 +23,3 @@ This is an assessment request, not an implementation request.
 ## Combat Specific
 
 If we are getting confused about the combat rule implementation, always reference how Lichtenauer actually treats combat!
-
-Rate Limit Guardrail: You are operating under a strict 40 Requests Per Minute (RPM) API limit. You must minimize API calls.
-Do not use multi-step reasoning unless absolutely necessary. Batch your tool calls. If you must make multiple consecutive requests,
-insert a deliberate pause (wait 2 seconds) between actions to prevent hitting the 429 Rate Limit error.
