@@ -19,7 +19,10 @@ using UnityEngine;
 /// as a <see cref="CombatSoundCue"/> - swing, miss, hit, parry, deflect, bind, death - so the fight can be
 /// followed by ear. Audio is not required: with nothing listening, each request is dropped.
 /// </summary>
+// Ordered after the other LateUpdate work on purpose: CombatHandler settles the weapon bone there, and a
+// sweep is only honest if it travels between the poses the player actually saw.
 [DisallowMultipleComponent]
+[DefaultExecutionOrder(100)]
 public sealed class WeaponDamage : MonoBehaviour
 {
     [SerializeField, Min(0f)] private float _damage = 10f;

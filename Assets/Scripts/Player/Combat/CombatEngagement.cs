@@ -113,12 +113,29 @@ namespace Player
             {
                 _nextScanTime = Time.time + _scanInterval;
                 ScanForHostiles();
+                PublishOpponentDistance();
             }
 
             if (!_awareness.Tick(_nearestHostileDistance, Time.deltaTime))
                 return;
 
             Apply(_awareness.IsEngaged);
+        }
+
+        /// <summary>
+        /// Keeps the fight's real distance on the <see cref="CombatHandler"/>.
+        ///
+        /// Measure-gated transitions and feints ask the agent for a distance, and until now the only
+        /// source was target lock, so an unlocked player fought with an opponent at infinity: every
+        /// range decision was made against "nobody is anywhere". The scan already knows the answer, so
+        /// it publishes it whether or not a target is locked.
+        /// </summary>
+        private void PublishOpponentDistance()
+        {
+            if (_combat == null)
+                return;
+
+            _combat.SetOpponentDistance(IsInCombat ? _nearestHostileDistance : float.PositiveInfinity);
         }
 
         /// <summary>
@@ -156,6 +173,7 @@ namespace Player
         {
             ResolveCombatHandler();
             _combat?.SetCombatActive(inCombat);
+            PublishOpponentDistance();
 
             if (_logCombatState)
             {

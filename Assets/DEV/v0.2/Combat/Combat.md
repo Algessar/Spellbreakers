@@ -22,7 +22,7 @@ has been left as its own file. Every other numbered section is preserved verbati
 
 ## 2.1 Guards Are Combat States
 
-The primary guards are:
+The primary guards are (left and right side):
 
 - **Vom Tag**
 - **Pflug**
@@ -30,7 +30,8 @@ The primary guards are:
 - **Ochs**
 - **Iron Gate**
 
-Plus **Langort**, which is a pose attacks pass *through* rather than one a fighter holds (see 5).
+Transition Poses: A set of intermediary poses that define the extreme passing pose. Langort is a common Transition Pose,
+but others exist, for correction of blade alignment etc. 
 
 These are not merely idle poses. They are the states through which combat flows.
 
@@ -583,7 +584,8 @@ Out of combat:
 ### Open questions
 
 - Whether the radii belong to the player, the enemy, or a shared engagement rule.
-- Whether leaving combat should require distance at all, or also a timeout since the last blade contact.
+  - Belonging to the enemy makes the most sense. The distance you want to keep is always based on the reach of the opponent.
+- Whether leaving combat should require distance only, or also a timeout since the last blade contact.
 - Whether an enemy should be able to disengage for the same reasons the player does.
 - Whether the guard buttons should gain a non-combat use, which is the reason for freeing them.
 

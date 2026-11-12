@@ -131,9 +131,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 37cfe7f8cba970f41b5128b6eaa32fd8, type: 3}
   m_Name: Archetype_Fencer
   m_EditorClassIdentifier: Spellbreakers.Gameplay::Spellbreakers.Ai.FencingArchetypeAsset
-  _reactionSeconds: 0.28
+  _reactionSeconds: 0.2
   _decisionInterval: 0.1
-  _aggression: 0.791
+  _aggression: 0.329
   _stepDistance: 0.6
   _preferredMinDistance: 1.1
   _preferredMaxDistance: 2.1
@@ -1169,6 +1169,14 @@ PrefabInstance:
       propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 4551392045802716311, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
+      propertyPath: _targetFacingDelay
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 4551392045802716311, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
+      propertyPath: _targetFacingTurnSpeed
+      value: 150
+      objectReference: {fileID: 0}
     - target: {fileID: 5613977798162136968, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
       propertyPath: ScanRecursively
       value: 0
@@ -1308,7 +1316,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1918446972}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dcd82bdcd43e4c0aa7e5373513281fde, type: 3}
   m_Name: 
@@ -1664,6 +1672,10 @@ PrefabInstance:
     - target: {fileID: 4619679815000510225, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
       propertyPath: _team
       value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 4619679815000510225, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
+      propertyPath: _maxHealth
+      value: 500
       objectReference: {fileID: 0}
     - target: {fileID: 4677162494428117452, guid: 2da4cbd86efecc946a83a30ff0d99f82, type: 3}
       propertyPath: m_Layer

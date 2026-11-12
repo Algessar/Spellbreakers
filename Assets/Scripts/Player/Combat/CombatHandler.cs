@@ -37,6 +37,10 @@ public sealed class CombatHandler : MonoBehaviour
              "ordinary locomotion states instead of a permanently raised sword.")]
     [SerializeField] private bool _startsInCombat = true;
 
+    [Tooltip("Bone the sword mesh is skinned to, used to keep the grip alive through a pass. Leave it " +
+             "empty to turn the grip correction off.")]
+    [SerializeField] private string _weaponBoneName = "DEF-WEAPON_MAIN";
+
     private readonly Dictionary<string, int> _passStateHashes = new Dictionary<string, int>();
 
     private Animator _animator;
@@ -47,6 +51,12 @@ public sealed class CombatHandler : MonoBehaviour
     private float _guardWeightTarget = 1f;
     private GuardKey _renderedGuard = GuardKey.None;
     private bool _initialized;
+
+    private Transform _weaponBone;
+    private Transform _gripHand;
+    private bool _gripCaptured;
+    private Vector3 _gripLocalPosition;
+    private Quaternion _gripLocalRotation;
 
     /// <summary>The shared combat state machine. AI, hit detection and debug tooling all read this.</summary>
     public FencingAgent Agent { get; private set; }
@@ -120,6 +130,8 @@ public sealed class CombatHandler : MonoBehaviour
             return;
         }
 
+        ResolveWeaponGrip();
+
         if (!HasGuardState(GuardKey.Right(_initialGuard)))
         {
             Debug.LogError(
@@ -172,6 +184,57 @@ public sealed class CombatHandler : MonoBehaviour
         Agent.Tick(Time.deltaTime);
         Realize();
         BlendGuardWeight();
+    }
+
+    /// <summary>
+    /// Keeps the sword in the hand while a pass plays.
+    ///
+    /// The transition and correction exports this project animates passes from carry humanoid muscle
+    /// curves only - no curves for the bone the sword mesh is skinned to. In Blender that bone follows the
+    /// grip through a constraint, which FBX cannot carry, so here it holds whatever the guard clip left:
+    /// the arm cuts and the blade stays behind up at the guard. That is what makes strikes look aimed off
+    /// to the side and makes them sweep empty air, because hit detection sweeps the blade itself.
+    ///
+    /// The guard clips <em>do</em> carry the bone, so the grip is known exactly whenever a guard is
+    /// showing. This records it in right-hand space and, for as long as the pass layer has weight,
+    /// re-applies it to the hand instead of the chest. At zero pass weight it does nothing at all, so
+    /// authored guard poses stay untouched, and it blends out on the layer's own weight so the
+    /// destination guard takes the sword back without a pop.
+    ///
+    /// LateUpdate is the first point after the Animator has written the pose, and it runs before
+    /// <see cref="WeaponDamage"/> samples the blade (that component is ordered later), so the hit test
+    /// sees the gripped sword. Once the exports bake the weapon bone, this is redundant and can go.
+    /// </summary>
+    private void LateUpdate()
+    {
+        if (!_initialized || _weaponBone == null || _gripHand == null)
+            return;
+
+        if (_passWeight <= 0.0001f)
+        {
+            // No pass on screen: the guard clip owns the weapon bone and is authoritative.
+            _gripCaptured = false;
+            return;
+        }
+
+        var handRotation = _gripHand.rotation;
+        var toHandSpace = Quaternion.Inverse(handRotation);
+        var livePosition = toHandSpace * (_weaponBone.position - _gripHand.position);
+        var liveRotation = toHandSpace * _weaponBone.rotation;
+
+        // Captured on the first frame of the pass, while the pose still is the guard it started from,
+        // which is the last moment the grip is known to be authored rather than inherited.
+        if (!_gripCaptured)
+        {
+            _gripLocalPosition = livePosition;
+            _gripLocalRotation = liveRotation;
+            _gripCaptured = true;
+        }
+
+        var blend = Mathf.Clamp01(_passWeight);
+        _weaponBone.rotation = handRotation * Quaternion.Slerp(liveRotation, _gripLocalRotation, blend);
+        _weaponBone.position = _gripHand.position +
+                               handRotation * Vector3.Lerp(livePosition, _gripLocalPosition, blend);
     }
 
     /// <summary>
@@ -241,14 +304,38 @@ public sealed class CombatHandler : MonoBehaviour
     /// <summary>
     /// The single intent entry point, shared by player input and enemy AI. Validation lives in the
     /// agent so both can never disagree about what is legal.
+    ///
+    /// Pressing a guard is also a way *into* a fight: with a hostile in range the press engages and then
+    /// runs the transition, so a deliberate guard and the automatic proximity engagement no longer
+    /// disagree about who starts the fight. Before this, a guard press outside engagement (18 m) was
+    /// dropped without a word, and the same press started working once combat had engaged on its own -
+    /// which reads as the character raising its guard on its own and ignoring the player.
     /// </summary>
     public RequestResult RequestGuard(GuardId guard)
     {
-        // No combat, no guard. This is what frees the guard inputs outside a fight.
-        if (!_initialized || !CombatActive)
+        if (!_initialized)
+            return RequestResult.Rejected;
+
+        if (!CombatActive && !TryEngageFromGuardPress())
             return RequestResult.Rejected;
 
         return Agent.RequestGuard(guard, _opponentDistance);
+    }
+
+    /// <summary>
+    /// Called only from a guard press. Returns false when there is nobody close enough to fight, which
+    /// leaves the guard inputs inert during exploration exactly as before.
+    /// </summary>
+    private bool TryEngageFromGuardPress()
+    {
+        var engagement = GetComponent<CombatEngagement>();
+        if (engagement == null)
+            engagement = GetComponentInParent<CombatEngagement>();
+
+        if (engagement == null || !engagement.TryEngage())
+            return false;
+
+        return CombatActive;
     }
 
     /// <summary>
@@ -303,7 +390,10 @@ public sealed class CombatHandler : MonoBehaviour
     /// </summary>
     public RequestResult RequestGuardMirrored()
     {
-        if (!_initialized || !CombatActive || Agent == null)
+        if (!_initialized || Agent == null)
+            return RequestResult.Rejected;
+
+        if (!CombatActive && !TryEngageFromGuardPress())
             return RequestResult.Rejected;
 
         return Agent.RequestMirror(_opponentDistance);
@@ -413,6 +503,43 @@ public sealed class CombatHandler : MonoBehaviour
     private void OnPhaseChanged(PassPhase phase)
     {
         PhaseChanged?.Invoke(phase);
+    }
+
+    /// <summary>
+    /// Resolves the two transforms the grip correction needs. Silent when the rig does not offer them:
+    /// the weapon bone is an extra, non-humanoid bone, so a differently authored model simply leaves the
+    /// correction off instead of erroring.
+    /// </summary>
+    private void ResolveWeaponGrip()
+    {
+        _gripHand = _animator.isHuman ? _animator.GetBoneTransform(HumanBodyBones.RightHand) : null;
+        _weaponBone = string.IsNullOrEmpty(_weaponBoneName)
+            ? null
+            : FindDescendant(_animator.transform, _weaponBoneName);
+
+        if (_gripHand != null && _weaponBone != null)
+            return;
+
+        _gripHand = null;
+        _weaponBone = null;
+    }
+
+    private static Transform FindDescendant(Transform root, string childName)
+    {
+        if (root == null)
+            return null;
+
+        if (root.name == childName)
+            return root;
+
+        for (var i = 0; i < root.childCount; i++)
+        {
+            var found = FindDescendant(root.GetChild(i), childName);
+            if (found != null)
+                return found;
+        }
+
+        return null;
     }
 
     private bool HasGuardState(GuardKey guard)

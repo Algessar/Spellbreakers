@@ -353,7 +353,7 @@ namespace Player
         // The Passes layer has IK Pass enabled so the pose correction is applied after its animation.
         private void OnAnimatorIK(int layerIndex)
         {
-            ProcessAnimatorIK(layerIndex);
+            // ProcessAnimatorIK(layerIndex);
         }
 
         internal void ProcessAnimatorIK(int layerIndex)
