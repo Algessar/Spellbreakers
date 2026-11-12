@@ -4,6 +4,7 @@
     "references": [
         "Spellbreakers.Core",
         "Spellbreakers.Spirits",
+        "Spellbreakers.World",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],
