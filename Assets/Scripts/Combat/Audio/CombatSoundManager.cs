@@ -558,24 +558,29 @@ namespace Spellbreakers.Combat
         }
 
         /// <summary>
-        /// Creates a manager if the scene has none and a profile exists in Resources.
+        /// Creates a manager if the scene has none and a profile exists in Resources, and returns the
+        /// manager that owns combat audio either way.
         ///
         /// The alternative is what happened to <see cref="CombatRulesBootstrap"/>: a component that exists,
         /// compiles, and is in no scene, so it silently does nothing. Dropping a profile into a Resources
         /// folder is then enough to hear the whole fight in any scene - including ones built by tooling that
         /// knows nothing about audio.
+        ///
+        /// This is called by <see cref="Spellbreakers.Gameplay.GameRoot"/> on every arrival rather than
+        /// from a <c>RuntimeInitializeOnLoadMethod</c> hook. The manager is deliberately scene-scoped - it
+        /// is destroyed with the scene and rebuilt for the next - so it has to be re-ensured, and the
+        /// lifetime is now decided in one place instead of by an attribute nobody can see from here.
         /// </summary>
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void EnsureInstanceForLoadedScenes()
+        public static CombatSoundManager EnsureInstance()
         {
             if (Instance != null)
-                return;
+                return Instance;
 
             if (Resources.Load<CombatSoundProfile>(ProfileResourcesPath) == null)
-                return;
+                return null;
 
             var host = new GameObject("Combat Sound Manager");
-            host.AddComponent<CombatSoundManager>();
+            return host.AddComponent<CombatSoundManager>();
         }
     }
 }

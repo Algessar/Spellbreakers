@@ -1,3 +1,5 @@
+using Spellbreakers.Gameplay;
+using Spellbreakers.World;
 using UnityEngine;
 
 namespace Player
@@ -19,6 +21,9 @@ namespace Player
         private PlayerCamera _camera;
         private CombatHandler _combat;
         private TargetingSystem _targeting;
+
+        /// <summary>The state gate, resolved when the handler is enabled. Null outside a running game.</summary>
+        private GameStateService _state;
 
         private void Awake()
         {
@@ -75,12 +80,24 @@ namespace Player
 
             if (_targeting != null)
                 player.SwitchTarget.started += _targeting.ToggleTargeting;
+
+            // The root builds the state service before any scene object wakes, so it exists by now. Null is
+            // still tolerated: without it the handler behaves exactly as it did before pausing existed.
+            _state = GameStateService.Instance;
+            if (_state != null)
+                _state.Changed += OnGameStateChanged;
+
+            ApplyInputGate();
         }
 
         private void OnDisable()
         {
             if (_actions == null)
                 return;
+
+            if (_state != null)
+                _state.Changed -= OnGameStateChanged;
+            _state = null;
 
             var player = _actions.Player;
 
@@ -123,6 +140,30 @@ namespace Player
             _actions.Disable();
             _actions.Dispose();
             _actions = null;
+        }
+
+        /// <summary>
+        /// Enables or disables the player's actions to match the game state.
+        ///
+        /// Reading every press and dropping the ones that should not count would still let the look axis
+        /// turn the camera behind an open menu, and still let a guard press engage a fight nobody can see.
+        /// Disabling the map also gets the value actions their normal re-enable behaviour, so a direction
+        /// held through a pause resumes on the way out instead of staying stuck at zero.
+        /// </summary>
+        private void ApplyInputGate()
+        {
+            if (_actions == null)
+                return;
+
+            if (_state == null || !_state.BlocksPlayerInput)
+                _actions.Player.Enable();
+            else
+                _actions.Player.Disable();
+        }
+
+        private void OnGameStateChanged(GameState from, GameState to)
+        {
+            ApplyInputGate();
         }
 
         /// <summary>Misconfigured prefabs should fail loudly and early rather than with a null reference.</summary>

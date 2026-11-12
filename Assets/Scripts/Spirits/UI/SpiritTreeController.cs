@@ -1,3 +1,4 @@
+using Spellbreakers.Gameplay;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -32,6 +33,13 @@ namespace Spellbreakers.Spirits
         private bool _previousCursorVisible;
         private CursorLockMode _previousCursorLock;
 
+        /// <summary>
+        /// Whether this window is the thing holding the game paused. Tracked separately from the pause
+        /// itself so that closing the window only resumes a pause the window asked for, rather than
+        /// assuming it owns the state.
+        /// </summary>
+        private bool _pausedByWindow;
+
         /// <summary>The single controller in play, or null before it bootstraps.</summary>
         public static SpiritTreeController Instance { get; private set; }
 
@@ -41,19 +49,23 @@ namespace Spellbreakers.Spirits
         public bool IsOpen => _ui != null && _ui.IsOpen;
 
         /// <summary>
-        /// Creates the controller in whatever scene starts. A static flag rather than a singleton singleton
-        /// pattern: entering play mode twice must still work, and <see cref="Instance"/> is cleared on
-        /// destroy.
+        /// Creates the controller if it does not exist yet, and returns whichever instance owns the
+        /// progression.
+        ///
+        /// Called by <see cref="Spellbreakers.Gameplay.GameRoot"/> rather than from a
+        /// <c>RuntimeInitializeOnLoadMethod</c> hook, so that the order services are built in is stated in
+        /// one readable place instead of being scattered across attributes. A static flag rather than a
+        /// singleton singleton pattern: entering play mode twice must still work, and <see cref="Instance"/>
+        /// is cleared on destroy.
         /// </summary>
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void Bootstrap()
+        public static SpiritTreeController EnsureInstance()
         {
             if (Instance != null)
-                return;
+                return Instance;
 
             var go = new GameObject("Spirit Tree");
             DontDestroyOnLoad(go);
-            go.AddComponent<SpiritTreeController>();
+            return go.AddComponent<SpiritTreeController>();
         }
 
         private void Awake()
@@ -95,6 +107,14 @@ namespace Spellbreakers.Spirits
 
         private void OnDestroy()
         {
+            // A controller torn down while its window is open must not leave the game paused with no way
+            // back, which is exactly what a scene unload during a pause would otherwise do.
+            if (_pausedByWindow)
+            {
+                GameStateService.Instance?.Resume();
+                _pausedByWindow = false;
+            }
+
             if (_actions != null)
             {
                 _actions.Dispose();
@@ -134,13 +154,33 @@ namespace Spellbreakers.Spirits
             SpiritProgressStore.Delete();
         }
 
+        /// <summary>
+        /// Opens the tree and pauses the game behind it.
+        ///
+        /// Before the state service existed the world kept simulating while this window was up: an opponent
+        /// could finish a transition and land a hit on a player who was reading a talent tree, and nothing
+        /// about the screen said so. Opening is refused outside play for the same reason - there is no
+        /// meaningful moment to spend points during a scene load or while dead.
+        /// </summary>
         public void Open()
         {
-            if (_ui == null)
+            if (_ui == null || _ui.IsOpen)
                 return;
+
+            var state = GameStateService.Instance;
+
+            if (state != null && state.BlocksPlayerInput)
+            {
+                Debug.Log($"[Spirits] The tree cannot open while the game is in {state.Current}.", this);
+                return;
+            }
 
             CaptureCursor();
             _ui.Show();
+
+            // Paused after showing, so a refused pause still leaves a usable window, and the flag below
+            // stays honest about whether this window is the reason time is stopped.
+            _pausedByWindow = state != null && state.Pause();
         }
 
         public void Close()
@@ -150,6 +190,12 @@ namespace Spellbreakers.Spirits
 
             _ui.Hide();
             RestoreCursor();
+
+            if (_pausedByWindow)
+            {
+                GameStateService.Instance?.Resume();
+                _pausedByWindow = false;
+            }
         }
 
         private void OnSpiritsPressed(InputAction.CallbackContext context)

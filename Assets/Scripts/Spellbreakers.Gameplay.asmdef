@@ -4,6 +4,7 @@
     "references": [
         "Spellbreakers.Core",
         "Spellbreakers.Spirits",
+        "Spellbreakers.World",
         "Unity.InputSystem",
         "Unity.TextMeshPro",
         "UnityEngine.UI",

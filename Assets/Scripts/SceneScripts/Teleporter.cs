@@ -1,152 +1,248 @@
-using System;
+using Player;
+using Spellbreakers.Gameplay;
 using UnityEngine;
-using UnityEngine.InputSystem;
-using UnityEngine.SceneManagement;
 
-public class Teleporter : MonoBehaviour 
+/// <summary>
+/// A teleport platform. Standing on it lights the disc, raises the compass and offers its runes; entering a
+/// rune travels to the scene that rune names.
+///
+/// This replaces a version whose travel was <c>SceneManager.LoadScene(buildIndex)</c>, where the rune's
+/// <c>int</c> had to equal a position in the build settings, and whose presentation did not work at all:
+/// the glow was computed from two fields that were never assigned and gated behind a flag that was never
+/// set, and the compass compared its position against a moving target it could never equal, so it moved
+/// once and never came back. Both are fixed here because a platform that does not visibly respond is
+/// indistinguishable from one that does not work.
+///
+/// Two behaviours are deliberate rather than incidental. Only the player can activate the platform - the
+/// character prefab is untagged, so the check is for the component that only the player carries - and
+/// stepping off clears the rune latches, so a second visit works and a fight next to the platform cannot
+/// start a scene load.
+/// </summary>
+[DisallowMultipleComponent]
+public class Teleporter : MonoBehaviour
 {
-    // Input or location for activating the portal
-    // Let's do location for now. I'd very much like visuals for this but I guess we can do material colour
+    [Header("Platform")]
+    [Tooltip("Mesh whose material glows while the platform is active.")]
+    [SerializeField] private GameObject _platformMesh;
 
-    private int _currentId = -1;
-    private Collider _collider;
+    [SerializeField] private Color _emissionColor = Color.red;
+    [SerializeField, Min(0f)] private float _emissionIntensity = 5f;
 
+    [Tooltip("Seconds for the glow to reach full once the player steps on.")]
+    [SerializeField, Min(0.01f)] private float _emissionFadeSeconds = 1f;
 
-    [Header("Platform mesh")] 
-    public GameObject _platformMesh;
-    private Material _material;
-    
-    // I can use the direction of the teleport compass to set ID
-    // Which then is the scene id in the build
-
-    // These can be separate empties with colliders on them. Then the index itself is the ID for the Scene
-    // [SerializeField] private Collider[] _colliders;
-
+    [Header("Runes")]
+    [Tooltip("Destinations offered while the player stands on the platform. Each carries its own scene id.")]
     [SerializeField] private EnterRuneTrigger[] _runes;
-    private Timer _timer;
 
-    [SerializeField] private float _duration = 10f;
-    [SerializeField] private float _speed = 5f;
-    
     [Header("Compass")]
-    [SerializeField] private Vector2 _compassDirection;
+    [Tooltip("Optional marker raised while the platform is active.")]
     [SerializeField] private GameObject _compass;
-    
-    private Vector3 startPos;
-    [SerializeField] private Vector3 targetPos;
-    private bool isMoving = false;
-    
-    
-    private void Start()
-    {
-        _timer = new();
 
+    [Tooltip("How far the compass rises, in the teleporter's local space.")]
+    [SerializeField, Min(0f)] private float _compassLift = 1f;
+
+    [Tooltip("Metres per second the compass travels.")]
+    [SerializeField, Min(0f)] private float _compassSpeed = 5f;
+
+    /// <summary>The instance material, so the glow never writes to the shared asset on disk.</summary>
+    private Material _material;
+
+    private Vector3 _compassRestLocalPosition;
+    private float _emissionProgress;
+    private bool _active;
+    private bool _departing;
+
+    private void Awake()
+    {
         if (_platformMesh == null)
         {
-            Debug.LogError("Teleporter has no platform mesh assigned.", this);
+            Debug.LogError($"{name}: no platform mesh assigned, so the teleporter cannot be seen. " +
+                           "Assign one or remove the component.", this);
             enabled = false;
             return;
         }
 
-        Renderer rend = _platformMesh.GetComponent<Renderer>();
-        if (rend != null)
+        var targetRenderer = _platformMesh.GetComponent<Renderer>();
+        if (targetRenderer == null)
         {
-            _material = rend.material;   // this is the material instance
-            _material.EnableKeyword("_EMISSION");
-        }
-        else
-        {
-            Debug.LogError("No Renderer found on " + _platformMesh.name, this);
+            Debug.LogError($"{name}: '{_platformMesh.name}' has no Renderer to glow.", this);
+            enabled = false;
+            return;
         }
 
-        //NOTE: The array will be populated manually!
+        _material = targetRenderer.material;
+        _material.EnableKeyword("_EMISSION");
 
-        for(int i = 0; i < _runes.Length; i++)
+        if (_compass != null)
+            _compassRestLocalPosition = _compass.transform.localPosition;
+    }
+
+    private void OnEnable()
+    {
+        if (_runes == null)
+            return;
+
+        // Each rune reports its own entry; the platform then reads the id off whichever one fired.
+        foreach (var rune in _runes)
         {
-            _runes[i]._triggerAction += ChangeScene;
-            _runes[i].gameObject.SetActive(false);
+            if (rune != null)
+                rune._triggerAction += OnRuneEntered;
         }
+    }
+
+    private void OnDisable()
+    {
+        if (_runes == null)
+            return;
+
+        foreach (var rune in _runes)
+        {
+            if (rune != null)
+                rune._triggerAction -= OnRuneEntered;
+        }
+    }
+
+    private void Start()
+    {
+        SetRunesVisible(false);
+        ApplyEmission(0f);
     }
 
     private void Update()
     {
-        SetEmission(Color.red, 5);
-        UpdateCompassMovement();
-        
+        UpdateEmission();
+        UpdateCompass();
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        if (other)
-        {
-            ActivateCompass();  
-            for(int i = 0; i < _runes.Length; i++)
-            {
-                if (i > 1) return; //NOTE: TEMP
-                    _runes[i].gameObject.SetActive(true);
-            }
-        }
+        if (_active || !IsPlayer(other))
+            return;
+
+        _active = true;
+        SetRunesVisible(true);
     }
 
-    private void ChangeScene()
+    private void OnTriggerExit(Collider other)
     {
-        for (int i = 0; i < _runes.Length; i++)
-        {
-            if (_runes[i].wasTriggered)
-            {
-                _currentId = _runes[i].ID;
-            }
-        }
-        Debug.Log($"Triggered ChangeScene from rune ID {_currentId}");
+        if (!_active || _departing || !IsPlayer(other))
+            return;
 
-        SceneManager.LoadScene(_currentId);
+        _active = false;
+        SetRunesVisible(false);
+
+        // Without this a rune fires exactly once ever, and the platform is dead on the second visit.
+        if (_runes == null)
+            return;
+
+        foreach (var rune in _runes)
+        {
+            if (rune != null)
+                rune.ResetTrigger();
+        }
     }
-   
 
     /// <summary>
-    /// Moves the Compass up to show it is active
+    /// The player is the only thing carrying an input handler, which is what this project has instead of a
+    /// tag on the character prefab.
     /// </summary>
-    private void ActivateCompass()
+    private static bool IsPlayer(Collider other)
     {
-        
-        if (isMoving) return; // already moving, ignore
-        
-        startPos = _compass.transform.localPosition;
-        targetPos = startPos + Vector3.up;   // 1 meter up (or use transform.up for local)
-        _timer.StartCountdown(_duration);
-        isMoving = true;
-    }
-    
-    private bool isGlowing = false;
-    float currentIntensity = 0;
-    private float maxIntensity;
-    private float duration;
-    public void SetEmission(Color color, float intensity)
-    {
-        
-        // Increase intensity over time
-        if (!isGlowing || _material == null) return;
-
-        currentIntensity += (maxIntensity / duration) * Time.deltaTime;
-        currentIntensity = Mathf.Min(currentIntensity, maxIntensity); // clamp
-            _material.SetColor("_EmissionColor", color * intensity);
-            
-        if (currentIntensity >= maxIntensity)
-                isGlowing = false; // done
+        return other != null && other.GetComponentInParent<InputHandler>() != null;
     }
 
-    private void UpdateCompassMovement()
+    private void OnRuneEntered()
     {
-        if (!_timer.IsFinished) return;
-        if (!isMoving) return;
+        if (_departing)
+            return;
 
-        float step = _speed * Time.deltaTime;
-        _compass.transform.localPosition = Vector3.MoveTowards(_compass.transform.localPosition, targetPos * -1, step);
-
-        if (_compass.transform.position == targetPos)
+        var rune = FirstTriggeredRune();
+        if (rune == null)
         {
-            isMoving = false;
+            Debug.LogWarning($"{name}: a rune fired but none was marked as triggered.", this);
+            return;
+        }
+
+        var flow = SceneFlow.Instance;
+        if (flow == null)
+        {
+            // Happens when playing a scene without the game root, for example a bare test scene.
+            Debug.LogError($"{name}: cannot travel to '{rune.SceneId}' because no SceneFlow exists in this " +
+                           "session.", this);
+            return;
+        }
+
+        _departing = true;
+
+        if (flow.Travel(rune.SceneId))
+            return;
+
+        // SceneFlow has already logged why. Staying put is the correct outcome; stay usable as well.
+        _departing = false;
+        rune.ResetTrigger();
+    }
+
+    private EnterRuneTrigger FirstTriggeredRune()
+    {
+        if (_runes == null)
+            return null;
+
+        foreach (var rune in _runes)
+        {
+            if (rune != null && rune.WasTriggered)
+                return rune;
+        }
+
+        return null;
+    }
+
+    private void SetRunesVisible(bool visible)
+    {
+        if (_runes == null)
+            return;
+
+        foreach (var rune in _runes)
+        {
+            if (rune != null)
+                rune.gameObject.SetActive(visible);
         }
     }
 
+    private void UpdateEmission()
+    {
+        if (_material == null)
+            return;
+
+        var target = _active ? 1f : 0f;
+        var step = Time.deltaTime / Mathf.Max(0.01f, _emissionFadeSeconds);
+
+        _emissionProgress = Mathf.MoveTowards(_emissionProgress, target, step);
+        ApplyEmission(_emissionProgress);
+    }
+
+    private void ApplyEmission(float progress)
+    {
+        if (_material == null)
+            return;
+
+        _material.SetColor("_EmissionColor", _emissionColor * (_emissionIntensity * Mathf.Clamp01(progress)));
+    }
+
+    private void UpdateCompass()
+    {
+        if (_compass == null)
+            return;
+
+        // localPosition throughout: the old version moved the local position and then compared against the
+        // world position, so the arrival test could never be true and the compass never finished its rise.
+        var target = _active
+            ? _compassRestLocalPosition + Vector3.up * _compassLift
+            : _compassRestLocalPosition;
+
+        _compass.transform.localPosition = Vector3.MoveTowards(
+            _compass.transform.localPosition,
+            target,
+            _compassSpeed * Time.deltaTime);
+    }
 }
